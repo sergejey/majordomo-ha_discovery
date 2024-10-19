@@ -42,7 +42,7 @@ if ($ha_object) {
 }
 
 
-$permit_joins = SQLSelect("SELECT ha_devices.*, ha_components.ID as HA_COMPONENT_ID, ha_components.VALUE FROM ha_components, ha_devices WHERE ha_components.HA_DEVICE_ID=ha_devices.ID AND HA_OBJECT='permit_join' ORDER BY ha_devices.TITLE");
+$permit_joins = SQLSelect("SELECT ha_devices.*, ha_components.ID as HA_COMPONENT_ID, ha_components.VALUE FROM ha_components, ha_devices WHERE ha_components.HA_DEVICE_ID=ha_devices.ID AND (HA_OBJECT='permit_join' OR HA_OBJECT LIKE '%PermitJoin') ORDER BY ha_devices.TITLE");
 if (isset($permit_joins[0])) {
     $total = count($permit_joins);
     $permit_join = gr('permit_join', 'int');
