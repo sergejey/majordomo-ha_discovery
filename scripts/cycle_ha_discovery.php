@@ -95,7 +95,8 @@ while ($mqtt_client->proc()) {
             $retain = $data_value['r'];
         }
         if ($topic != '') {
-            DebMes("Publishing to $topic: $value", 'ha_discovery_set');
+            $value = (is_bool($value) ? ($value ? 'true' : 'false') : $value);
+            DebMes("Publishing to $topic: " . $value, 'ha_discovery_set');
             $mqtt_client->publish($topic, $value, $qos, $retain);
         }
     }

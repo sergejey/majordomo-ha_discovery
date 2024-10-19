@@ -260,7 +260,7 @@ class ha_discovery extends module
             $this->processMessage($_REQUEST['topic'], $_REQUEST['msg']);
         }
         if (isset($params['create_device_id']) && $this->canCreateDevice($params['create_device_id'])) {
-            $this->log("API call to create device: ".$params['create_device_id'], "new_device");
+            $this->log("API call to create device: " . $params['create_device_id'], "new_device");
             $this->createDevice((int)$params['create_device_id']);
         }
         if (isset($params['component_id']) && isset($params['set_value'])) {
@@ -283,7 +283,7 @@ class ha_discovery extends module
             $items = explode('/', $topic);
             $last_index = count($items) - 1;
             if ($last_index < 0) {
-                $this->log("Incorrect message","error");
+                $this->log("Incorrect message", "error");
                 return false;
             }
 
@@ -891,17 +891,23 @@ class ha_discovery extends module
         } elseif ($component_type == 'light_brightness' && $schema == 'json') {
             $data = array();
             $data['brightness'] = $value;
+        } elseif (isset($payload['payload_on']) && $value) {
+            $this->log("Sending payload_on = " . (is_bool($payload['payload_on']) ? ($payload['payload_on'] ? 'true' : 'false') : $payload['payload_on']), 'set');
+            $data = $payload['payload_on'];
+        } elseif (isset($payload['payload_off']) && !$value) {
+            $this->log("Sending payload_off = " . (is_bool($payload['payload_off']) ? ($payload['payload_off'] ? 'true' : 'false') : $payload['payload_off']), 'set');
+            $data = $payload['payload_off'];
         } else {
             $data = $value;
         }
 
         if (is_array($data)) {
             $send = array('v' => json_encode($data, JSON_NUMERIC_CHECK));
-            $this->log("Sending to $command_topic :" . $send['v'], 'set');
+            $this->log("Sending to $command_topic: " . $send['v'], 'set');
             addToOperationsQueue('ha_discovery_queue', $command_topic, json_encode($send, JSON_NUMERIC_CHECK), true);
         } else {
             $send = array('v' => $data);
-            $this->log("Sending to $command_topic :" . $send['v'], 'set');
+            $this->log("Sending to $command_topic: " . (is_bool($send['v']) ? ($send['v'] ? 'true' : 'false') : $send['v']), 'set');
             addToOperationsQueue('ha_discovery_queue', $command_topic, json_encode($send, JSON_NUMERIC_CHECK), true);
         }
 
@@ -955,8 +961,8 @@ class ha_discovery extends module
     function log($message, $file = '')
     {
         $this->getConfig();
-        if ($file!='') {
-            $file = 'ha_discovery_'.$file;
+        if ($file != '') {
+            $file = 'ha_discovery_' . $file;
         } else {
             $file = 'ha_discovery';
         }
