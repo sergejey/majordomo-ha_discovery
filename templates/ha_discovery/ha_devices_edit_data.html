@@ -1,0 +1,191 @@
+<script type="text/javascript">
+ let deviceTimer=0;
+ function reloadDeviceData() {
+  clearTimeout(deviceTimer);
+  let url="?id=<#ID#>&view_mode=<#VIEW_MODE#>&tab=<#TAB#>&ajax=1";
+  $.ajax({
+   url: url
+  }).done(function(data) {
+   if (typeof data == 'object') {
+    for(let i=0;i<data.length;i++) {
+     //alert(data[i].TITLE);
+     var oldValue=$('#component'+data[i].ID+'_value').html();
+     $('#component'+data[i].ID+'_value').html(data[i].VALUE);
+     $('#component'+data[i].ID+'_updated').html(data[i].UPDATED);
+     if (data[i].VALUE!=oldValue) {
+      $('#component'+data[i].ID+'_value').stop().fadeTo(100, 0.1).fadeTo(200, 1.0);
+      $('#component'+data[i].ID+'_updated').stop().fadeTo(100, 0.1).fadeTo(200, 1.0);
+     }
+
+    }
+   }
+   deviceTimer=setTimeout('reloadDeviceData();',2000);
+  });
+ }
+ $(document).ready(function() {
+  deviceTimer=setTimeout('reloadDeviceData();',2000);
+ });
+</script>
+
+<div class="row">
+ <div class="col-md-6">
+  <table class="table">
+   <tr>
+    <td>Object (Component)</td>
+    <td>&nbsp;</td>
+    <td><#LANG_VALUE#></td>
+    <td><#LANG_UPDATED#></td>
+   </tr>
+   [#begin PROPERTIES#]
+   <tr[#if ID="<#COMPONENT_ID#>"#] style="background-color:lightgreen;"[#endif#]>
+   <td valign="top"><a href="?id=<#ID#>&view_mode=<#VIEW_MODE#>&tab=<#TAB#>&component_id=[#ID#]">[#HA_OBJECT#]</a> ([#HA_COMPONENT#])</td>
+   <td valign="top">
+    [#if LINKED_OBJECT!=""#][#LINKED_OBJECT#][#endif#]
+    [#if LINKED_PROPERTY!=""#].[#LINKED_PROPERTY#][#endif#]
+    [#if LINKED_METHOD!=""#] &gt; [#LINKED_METHOD#][#endif#]
+   </td>
+   <td valign="top" id="component[#ID#]_value">[#VALUE#]</td>
+   <td valign="top" id="component[#ID#]_updated">[#UPDATED#]</td>
+   </tr>
+   [#end PROPERTIES#]
+  </table>
+ </div>
+ <div class="col-md-6">
+
+  [#if LINKED_DEVICES#]
+  [#begin LINKED_DEVICES#]
+  <div>
+   [#module name="devices" id="<#LINKED_DEVICES.ID#>"#]
+  </div>
+  <a href="<#ROOTHTML#>panel/devices/<#LINKED_DEVICES.ID#>.html?tab=settings" class="btn btn-default"><#LANG_DEVICE#> / <#LANG_SECTION_SETTINGS#></a>
+  [#end LINKED_DEVICES#]
+  [#endif#]
+
+
+  [#if CAN_CREATE_DEVICE="1"#]
+  <p>
+   <a href="?id=<#ID#>&view_mode=<#VIEW_MODE#>&tab=<#TAB#>&mode=create_device" class="btn btn-default btn-primary"><#LANG_DEVICE#>: <#LANG_DEVICES_ADD_OBJECT_AUTOMATICALLY#></a>
+  </p>
+
+  [#if DEVICES_TO_LINK#]
+  <p>&nbsp;</p>
+  <p><#LANG_DEVICES_CHOOSE_EXISTING#></p>
+  <form class="form" action="?" method="post">
+   <select name="device_id" class="form-control">
+    <option value="0"></option>
+    [#begin DEVICES_TO_LINK#]
+    <option value="[#ID#]">[#TITLE#]</option>
+    [#end DEVICES_TO_LINK#]
+   </select><br/>
+   <input type="submit" value="<#LANG_ADD#>" class="btn btn-default">
+   <input type="hidden" name="id" value="<#ID#>">
+   <input type="hidden" name="view_mode" value="<#VIEW_MODE#>">
+   <input type="hidden" name="tab" value="<#TAB#>">
+   <input type="hidden" name="prop_id" value="<#PROP_ID#>">
+   <input type="hidden" name="mode" value="link_device">
+  </form>
+  [#endif#]
+  [#endif CAN_CREATE#]
+
+  [#if COMPONENT_ID!=""#]
+  <form class="form" action="?" method="post">
+
+   <div class="form-group">
+    <label>Object / Component:</label>
+    <div class="controls">
+     <input type="text" class="form-control" value="[#COMPONENT_HA_OBJECT#] / [#COMPONENT_HA_COMPONENT#]" disabled>
+    </div>
+   </div>
+
+   <div class="form-group">
+    <label><#LANG_VALUE#>:</label>
+    <div class="controls">
+     <input type="text" class="form-control" value="[#COMPONENT_VALUE#]" disabled>
+    </div>
+   </div>
+
+   [#if CAN_SET="1"#]
+   <div class="form-group">
+    <label><#LANG_SET#>:</label>
+    <div class="controls">
+     <input type="text" class="form-control" name="new_value" value="">
+    </div>
+   </div>
+   [#endif CAN_SET#]
+
+
+   <div class="form-group">
+    <label><#LANG_LINKED_OBJECT#>:</label>
+    <div>
+     <input type="text" id="linked_object" name="linked_object" class="form-control" value="[#COMPONENT_LINKED_OBJECT#]">
+    </div>
+   </div>
+   <div class="form-group">
+    <label><#LANG_PROPERTY#>:</label>
+    <div>
+     <input type="text" id="linked_property" name="linked_property" class="form-control" value="[#COMPONENT_LINKED_PROPERTY#]">
+    </div>
+   </div>
+   <div class="form-group">
+    <label><#LANG_METHOD#>:</label>
+    <div>
+     <input type="text" id="linked_method" name="linked_method" class="form-control" value="[#COMPONENT_LINKED_METHOD#]">
+    </div>
+   </div>
+
+   [#module name="linkedobject" object_field="linked_object" property_field="linked_property" method_field="linked_method"#]
+
+   <div class="form-group">
+    <label><#LANG_UPDATED#>:</label>
+    <div class="controls">
+     <input type="text" class="form-control" value="[#COMPONENT_UPDATED#]" disabled>
+    </div>
+   </div>
+
+   <div class="form-group">
+    <label>MQTT topic:</label>
+    <div class="controls">
+     <input type="text" class="form-control" value="[#COMPONENT_MQTT_TOPIC#]" disabled>
+    </div>
+   </div>
+
+   <div class="form-group">
+    <label>
+     <a href="#" onclick="$('#component_payload').toggle();return false;">Payload</a>
+    </label>
+    <div class="controls" style="display:none" id="component_payload">
+     <pre>[#COMPONENT_COMPONENT_PAYLOAD#]</pre>
+    </div>
+   </div>
+
+   <div class="form-group">
+    <label>
+     <a href="#" onclick="$('#component_latest_data').toggle();return false;">Latest data</a>
+     <a href="?id=<#ID#>&view_mode=<#VIEW_MODE#>&tab=<#TAB#>&component_id=[#COMPONENT_ID#]&mode=refresh_data" class="btn btn-default btn-sm"><i class="glyphicon glyphicon-refresh"></i> process</a>
+    </label>
+    <div class="controls" id="component_latest_data" style="display:none">
+     <pre>[#COMPONENT_DATA_PAYLOAD#]</pre>
+    </div>
+   </div>
+
+   <div class="form-group">
+    <input type="submit" class="btn btn-default btn-primary" value="<#LANG_SUBMIT#>">
+   </div>
+   <input type="hidden" name="id" value="<#ID#>">
+   <input type="hidden" name="view_mode" value="<#VIEW_MODE#>">
+   <input type="hidden" name="tab" value="<#TAB#>">
+   <input type="hidden" name="component_id" value="<#COMPONENT_ID#>">
+   <input type="hidden" name="mode" value="update">
+  </form>
+  [#if CAN_SET="1"#]
+  <p>
+  <#LANG_CODE#>:
+  <pre>callAPI('/api/module/ha_discovery','GET',array('component_id'=><#COMPONENT_ID#>, 'set_value'=>'value'));</pre>
+  </p>
+  [#endif CAN_SET#]
+  [#endif COMPONENT_ID#]
+ </div>
+</div>
+
+
+

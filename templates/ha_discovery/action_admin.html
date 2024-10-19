@@ -1,0 +1,171 @@
+
+<!-- table zwave_devices search -->
+
+
+<div class="row">
+    <div class="col-md-3">
+        <form action="?" method="get" class="form form-inline">
+            <div class="form-group">
+                <input type="text" name="search" placeholder="<#LANG_SEARCH#>" value="[#SEARCH#]" class="form-control">
+            </div>
+            <div class="form-group">
+                <input type="submit" class="btn btn-default btn-primary" value="<#LANG_SEARCH#>">
+                [#if FILTER!=""#]<a href="?" class="btn btn-default"><#LANG_ALL#></a>[#endif#]
+            </div>
+        </form>
+    </div>
+
+    <div class="col-md-2">
+        [#if PERMIT_JOINS#]
+            [#begin PERMIT_JOINS#]
+            <a href="?id=[#ID#]&view_mode=edit_ha_devices">[#TITLE#]</a> - discovery mode
+            ([#if VALUE="1" || VALUE="on"#]<#LANG_ON#>[#else#]<#LANG_OFF#>[#endif#])
+            <a href="?permit_join=[#ID#]&set=1" class="btn btn-default btn-xs"><#LANG_ON#></a>
+            <a href="?permit_join=[#ID#]&set=0" class="btn btn-default btn-xs"><#LANG_OFF#></a>
+            <br/>
+            [#end PERMIT_JOINS#]
+        [#endif#]
+    </div>
+    <div class="col-md-6">
+        [#module name="xray" action="service" cycle="ha_discovery"#]
+    </div>
+    <div class="col-md-1">
+        <a href="#" onClick="$('#api_settings').toggle();return false;" class="btn btn-default"><i class="glyphicon glyphicon-wrench"></i> <#LANG_SETUP#></a>
+    </div>
+
+</div>
+
+<div style="display:none" id='api_settings'>
+&nbsp;
+<form action="?" method="post" enctype="multipart/form-data" name="frmEdit" class="form">
+<fieldset>
+
+    <div class="form-group[#if ERR_MQTT_HOST#] has-error[#endif#]">
+        <label>
+            MQTT host:
+        </label>
+        <input type="text" name="mqtt_host" value="[#MQTT_HOST#]" class="form-control">
+    </div>
+    <div class="form-group[#if ERR_MQTT_PORT#] has-error[#endif#]">
+        <label>
+            MQTT port:
+        </label>
+        <input type="text" name="mqtt_port" value="[#MQTT_PORT#]" class="form-control">
+    </div>
+
+    <div class="form-group">
+        <label>
+    Authorization required:
+    </label>
+    <input type="radio" value="1" name="mqtt_auth" [#if MQTT_AUTH="1"#] checked[#endif#]> <#LANG_YES#>
+    <input type="radio" value="0" name="mqtt_auth" [#if MQTT_AUTH!="1"#] checked[#endif#]> <#LANG_NO#>
+    <br/>&nbsp;
+</div>
+
+<div id="mqtt_authorization"[#if MQTT_AUTH!="1"#] style="display:none"[#endif#]>
+<div class="form-group">
+    <label>
+        MQTT <#LANG_USERNAME#>:
+    </label>
+    <input type="text" name="mqtt_username" value="[#MQTT_USERNAME#]" class="form-control">
+</div>
+
+<div class="form-group">
+    <label>
+        MQTT <#LANG_PASSWORD#>:
+    </label>
+    <input type="password" name="mqtt_password" value="[#MQTT_PASSWORD#]" class="form-control">
+</div>
+</div>
+
+<div class="form-group">
+ <label [#if ERR_BASE_TOPIC#] style="color:red;font-weight:bold"[#endif#]>
+ Base topic:
+ </label>
+ <input type="text" placeholder="homeassistant" name="base_topic" value="[#BASE_TOPIC#]" class="form-control">
+</div>
+
+    <div class="form-group">
+        <label class="control-label">
+            Debug mode (extra logging):
+        </label>
+        <input type="radio" name="debug_mode" value="1"[#if DEBUG_MODE="1"#] checked[#endif#]> <#LANG_YES#>
+        <input type="radio" name="debug_mode" value="0"[#if DEBUG_MODE!="1"#] checked[#endif#]> <#LANG_NO#>
+    </div>
+
+    <div class="form-group">
+        <label class="control-label">
+            Create devices automatically (experimental!):
+        </label>
+        <input type="radio" name="create_devices_automatically" value="1"[#if CREATE_DEVICES_AUTOMATICALLY="1"#] checked[#endif#]> <#LANG_YES#>
+        <input type="radio" name="create_devices_automatically" value="0"[#if CREATE_DEVICES_AUTOMATICALLY!="1"#] checked[#endif#]> <#LANG_NO#>
+        (<a href="?view_mode=list_unsupported">check for unsupported devices</a>)
+    </div>
+
+<div class="form-actions">
+<button type="submit" name="subm" value="Submit" class="btn btn-primary"><#LANG_UPDATE#></button>
+<input type="hidden" name="view_mode" value="update_settings">
+<input type="hidden" name="mode" value="update">
+</div>
+</fieldset>
+</form>
+</div>
+ <!-- action usual -->
+ [#if DATA_SOURCE="ha_devices" || DATA_SOURCE=""#]
+ <!-- table ha_devices search -->
+ [#if VIEW_MODE="search_ha_devices" || VIEW_MODE=""#]
+  [#inc ha_devices_search_admin.html#]
+ [#endif VIEW_MODE#]
+ <!-- / table ha_devices search -->
+ <!-- table ha_devices edit -->
+ [#if VIEW_MODE="edit_ha_devices"#]
+   [#if ID!=""#]
+   [#if TITLE!=""#]<h4>[#TITLE#]</h4>[#endif TITLE#]
+<ul class="nav nav-tabs">
+  <li[#if TAB=""#] class="active"[#endif#]>
+   <a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&id=<#ID#>&tab="><#LANG_GENERAL#></a>
+  </li>
+  <li[#if TAB="data"#] class="active"[#endif#]>
+   <a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&id=<#ID#>&tab=data">&#060#LANG_DATA#&#062</a>
+  </li>
+</ul>
+&nbsp;<br/>
+   [#endif ID#]
+   [#if TAB=""#]
+    [#inc ha_devices_edit_default.html#]
+   [#endif TAB#]
+   [#if TAB="data"#]
+    [#inc ha_devices_edit_data.html#]
+   [#endif TAB#]
+ [#endif VIEW_MODE#]
+ <!-- / table ha_devices edit -->
+ <!-- table ha_devices view --> 
+ [#if VIEW_MODE="view_ha_devices"#]
+   [#if TAB=""#]
+    [#inc ha_devices_view_default.html#]
+   [#endif TAB#]
+ [#endif VIEW_MODE#]
+ <!-- / table ha_devices view -->
+ [#endif DATA_SOURCE#]
+ <!-- action usual -->
+ [#if DATA_SOURCE="ha_components"#]
+ <!-- table ha_components search -->
+ [#if VIEW_MODE="search_ha_components" || VIEW_MODE=""#]
+  [#inc ha_components_search_admin.html#]
+ [#endif VIEW_MODE#]
+ <!-- / table ha_components search -->
+ <!-- table ha_components edit -->
+ [#if VIEW_MODE="edit_ha_components"#]
+   [#inc ha_components_edit.html#]
+ [#endif VIEW_MODE#]
+ <!-- / table ha_components edit -->
+ <!-- table ha_components view --> 
+ [#if VIEW_MODE="view_ha_components"#]
+   [#inc ha_components_view.html#]
+ [#endif VIEW_MODE#]
+ <!-- / table ha_components view -->
+ [#endif DATA_SOURCE#]
+
+[#if VIEW_MODE="list_unsupported"#]
+[#inc list_unsupported.html#]
+[#endif VIEW_MODE#]
