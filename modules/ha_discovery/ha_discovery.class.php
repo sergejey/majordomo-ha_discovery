@@ -339,7 +339,7 @@ class ha_discovery extends module
         }
     }
 
-    function processComponentMessage($component, $data)
+    function processComponentMessage($component, $data, $force = false)
     {
         SQLExec("UPDATE ha_devices SET UPDATED='" . date('Y-m-d H:i:s') . "' WHERE ID=" . (int)$component['HA_DEVICE_ID']);
         $payload = json_decode($component['COMPONENT_PAYLOAD'], true);
@@ -348,8 +348,6 @@ class ha_discovery extends module
             $component['VALUE'] = $data;
         } elseif (isset($payload['value_template'])) {
             $component['VALUE'] = $this->parseJingaTemplate($data, $payload['value_template']);
-            //dprint($data, false);
-            //dprint($component['VALUE'],false);
         }
         if ($component['HA_COMPONENT'] == 'light' && isset($data['state'])) {
             $component['VALUE'] = strtolower($data['state']);
@@ -402,7 +400,9 @@ class ha_discovery extends module
             }
 
             if ($component['VALUE'] != $old_value
-                || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)) {
+                || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)
+                || $force
+            ) {
                 if ($component['LINKED_PROPERTY']) {
                     setGlobal($component['LINKED_OBJECT'] . '.' . $component['LINKED_PROPERTY'], $new_value, array($this->name => '0'));
                 }
@@ -564,6 +564,21 @@ class ha_discovery extends module
 
         $linked_object = $sdevice['LINKED_OBJECT'];
 
+        if ($types) {
+            if (isModuleInstalled('zigbeedev')) {
+                $zigbeeDevProperties = SQLSelect("SELECT * FROM zigbeeproperties WHERE LINKED_OBJECT='" . $linked_object . "'");
+                $total = count($zigbeeDevProperties);
+                for ($i = 0; $i < $total; $i++) {
+                    $property = $zigbeeDevProperties[$i]['LINKED_PROPERTY'];
+                    $zigbeeDevProperties[$i]['LINKED_OBJECT'] = '';
+                    $zigbeeDevProperties[$i]['LINKED_PROPERTY'] = '';
+                    SQLUpdate('zigbeeproperties', $zigbeeDevProperties[$i]);
+                    removeLinkedPropertyIfNotUsed('zigbeeproperties', $linked_object, $property, 'zigbeedev');
+                }
+            }
+        }
+
+
         foreach ($types as $type) {
             if (is_array($type['properties'])) {
                 foreach ($type['properties'] as $k => $v) {
@@ -576,7 +591,7 @@ class ha_discovery extends module
                     SQLUpdate('ha_components', $prop);
                     addLinkedProperty($prop['LINKED_OBJECT'], $prop['LINKED_PROPERTY'], $this->name);
                     if ($prop['VALUE'] != '') {
-                        setGlobal($prop['LINKED_OBJECT'] . '.' . $prop['LINKED_PROPERTY'], $prop['VALUE']);
+                        $this->processComponentMessage($prop, json_decode($prop['DATA_PAYLOAD'], true), true);
                     }
                 }
             }

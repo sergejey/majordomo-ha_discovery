@@ -100,6 +100,12 @@ if ($this->tab == 'data') {
             $payload = json_decode($properties[$i]['COMPONENT_PAYLOAD'], true);
             if (isset($payload['command_topic']) && $payload['command_topic'] != '') {
                 $out['CAN_SET'] = 1;
+                if ($properties[$i]['HA_COMPONENT']=='select' && isset($payload['options'])) {
+                    foreach($payload['options'] as $option) {
+                        $out['SELECT_OPTIONS'][]=array('VALUE'=>$option);
+                    }
+                    $out['CAN_SET_SELECT']=1;
+                }
             }
             foreach ($properties[$i] as $k => $v) {
                 $out['COMPONENT_' . $k] = htmlspecialchars($v);

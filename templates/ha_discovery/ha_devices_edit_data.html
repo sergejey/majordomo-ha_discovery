@@ -108,7 +108,16 @@
    <div class="form-group">
     <label><#LANG_SET#>:</label>
     <div class="controls">
+     [#if SELECT_OPTIONS#]
+     <select name="new_value" class="form-control">
+      <option value=""></option>
+      [#begin SELECT_OPTIONS#]
+      <option value="[#VALUE#]">[#VALUE#]</option>
+      [#end SELECT_OPTIONS#]
+     </select>
+     [#else#]
      <input type="text" class="form-control" name="new_value" value="">
+     [#endif#]
     </div>
    </div>
    [#endif CAN_SET#]
