@@ -555,10 +555,10 @@ class ha_discovery extends module
     }
 
 
-    function linkDevice($device_id, $simple_device_id)
+    function linkDevice($device_id, $simple_device_id, $exclude_taken = false)
     {
 
-        $types = $this->checkDeviceType($device_id);
+        $types = $this->checkDeviceType($device_id, $exclude_taken);
         $sdevice = SQLSelectOne("SELECT * FROM devices WHERE ID=" . (int)$simple_device_id);
         if (!isset($sdevice['ID'])) return false;
 
@@ -615,24 +615,29 @@ class ha_discovery extends module
 
     }
 
-    function checkDeviceType($device_id)
+    function checkDeviceType($device_id, $exclude_taken = false)
     {
 
         $ha_device = SQLSelectOne("SELECT * FROM ha_devices WHERE ID=" . (int)$device_id);
         $this->log("Checking device type for " . json_encode($ha_device), 'checkdevicetype');
 
         // find by model
-        $models = array();
-        require DIR_MODULES . 'ha_discovery/known_devices.inc.php';
-        foreach ($models as $model => $data) {
-            if (is_integer(strpos(strtolower($ha_device['MODEL']), strtolower($model)))) {
-                return $data;
+        if (!$exclude_taken) {
+            $models = array();
+            require DIR_MODULES . 'ha_discovery/known_devices.inc.php';
+            foreach ($models as $model => $data) {
+                if (is_integer(strpos(strtolower($ha_device['MODEL']), strtolower($model)))) {
+                    return $data;
+                }
             }
         }
-
         $data = false;
         // find by components
-        $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
+        if ($exclude_taken) {
+            $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID'] . " AND LINKED_OBJECT=''");
+        } else {
+            $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
+        }
         $definition = array();
         $total = count($components);
         for ($i = 0; $i < $total; $i++) {
@@ -653,17 +658,6 @@ class ha_discovery extends module
             //leak sensor
             $device_type = 'leak';
             $data = array($device_type => array('properties' => array('water_leak' => 'status')));
-        }
-        if (!$device_type && isset($definition['sensor']['illuminance_lux'])) {
-            //light sensor
-            $device_type = 'sensor_light';
-            $data = array($device_type => array('properties' => array('illuminance_lux' => 'value')));
-            $data[$device_type]['settings']['unit'] = 'Lux';
-        }
-        if (!$device_type && isset($definition['sensor']['illuminance'])) {
-            //light sensor
-            $device_type = 'sensor_light';
-            $data = array($device_type => array('properties' => array('illuminance' => 'value')));
         }
         if (!$device_type && isset($definition['sensor']['temperature']) && isset($definition['sensor']['humidity'])) {
             //temperature+humidity
@@ -698,6 +692,22 @@ class ha_discovery extends module
                     )
                 )
             );
+        }
+        if (!$device_type && isset($definition['sensor']['illuminance_lux'])) {
+            //light sensor
+            $device_type = 'sensor_light';
+            $data = array($device_type => array('properties' => array('illuminance_lux' => 'value')));
+            $data[$device_type]['settings']['unit'] = 'Lux';
+        }
+        if (!$device_type && isset($definition['sensor']['illuminance'])) {
+            //light sensor
+            $device_type = 'sensor_light';
+            $data = array($device_type => array('properties' => array('illuminance' => 'value')));
+        }
+        if (!$device_type && isset($definition['sensor']['pressure'])) {
+            //pressure sensor
+            $device_type = 'sensor_pressure';
+            $data = array($device_type => array('properties' => array('pressure' => 'value')));
         }
         if (!$device_type && isset($definition['light']['light']) && isset($definition['light_rgb']['light_rgb'])) {
             //dimmer
@@ -777,13 +787,19 @@ class ha_discovery extends module
         return $data;
     }
 
-    function createDevice($device_id)
+    function createDevice($device_id, $parent_simple_device_id = 0)
     {
         $this->log("Trying to create simple device for $device_id", 'new_device');
         include_once DIR_MODULES . 'devices/devices.class.php';
         $devices_module = new devices();
         $devices_module->setDictionary();
-        $types = $this->checkDeviceType($device_id);
+        if ($parent_simple_device_id) {
+            $exclude_taken = true;
+        } else {
+            $exclude_taken = false;
+        }
+        $types = $this->checkDeviceType($device_id, $exclude_taken);
+        if ($types == false) return;
         foreach ($types as $type => $details) {
             if (isset($devices_module->device_types[$type])) {
 
@@ -805,15 +821,17 @@ class ha_discovery extends module
                         }
                     }
                 }
-                $options = array('TITLE' => $new_title);
+                $options = array('TITLE' => $new_title, "PARENT_ID" => $parent_simple_device_id);
                 $this->log("Adding new device: " . json_encode($options), 'new_device');
                 if ($devices_module->addDevice($type, $options)) {
                     $added_device = SQLSelectOne("SELECT ID FROM devices WHERE TITLE='" . DBSafe($new_title) . "'");
-                    $this->linkDevice($device_id, $added_device['ID']);
+                    $this->linkDevice($device_id, $added_device['ID'], $exclude_taken);
+                    if (!$parent_simple_device_id) $parent_simple_device_id = $added_device['ID'];
                 }
                 if (isset($details['last']) && $details['last']) break;
             }
         }
+        $this->createDevice($device_id, $parent_simple_device_id);
     }
 
     function canCreateDevice($device_id)
