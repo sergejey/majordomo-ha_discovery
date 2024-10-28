@@ -76,18 +76,22 @@ if ($res[0]['ID']) {
     for ($i = 0; $i < $total; $i++) {
         // some action for every record if required
         $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . $res[$i]['ID'] . " ORDER BY HA_OBJECT");
-        $device_id = 0;
+        $seen_device = array();
         foreach ($components as $k => $v) {
             $res[$i]['DATA'] .= $v['HA_OBJECT'] . ': ' . $v['VALUE'] . '; ';
-            if (!$device_id) {
-                if ($v['LINKED_OBJECT'] != '') {
-                    $dev_rec = SQLSelectOne("SELECT ID, TITLE FROM devices WHERE LINKED_OBJECT='" . $v['LINKED_OBJECT'] . "'");
-                    if ($dev_rec['ID']) {
-                        $device_id = $dev_rec['ID'];
-                        $res[$i]['DEVICE'] .= '<a href="/panel/devices/' . $dev_rec['ID'] . '.html?tab=settings">' . $dev_rec['TITLE'] . "</a>";
+
+            if ($v['LINKED_OBJECT'] != '') {
+                $dev_rec = SQLSelectOne("SELECT ID, TITLE FROM devices WHERE LINKED_OBJECT='" . $v['LINKED_OBJECT'] . "'");
+                if ($dev_rec['ID']) {
+                    $device_id = $dev_rec['ID'];
+                    if (!$seen_device[$dev_rec['ID']]) {
+                        $seen_device[$dev_rec['ID']] = 1;
+                        $res[$i]['DEVICE'] .= '<a href="/panel/devices/' . $dev_rec['ID'] . '.html?tab=settings">' . $dev_rec['TITLE'] . "</a><br/>";
                     }
+
                 }
             }
+
         }
     }
     $out['RESULT'] = $res;

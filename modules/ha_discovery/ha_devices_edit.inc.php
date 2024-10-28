@@ -6,7 +6,7 @@ if ($this->owner->name == 'panel') {
     $out['CONTROLPANEL'] = 1;
 }
 
-$out['FILTER']=1;
+$out['FILTER'] = 1;
 
 $table_name = 'ha_devices';
 $rec = SQLSelectOne("SELECT * FROM $table_name WHERE ID='$id'");
@@ -82,13 +82,14 @@ if ($this->tab == 'data') {
             foreach ($properties as $prop) {
                 if ($prop['LINKED_OBJECT'] != '' && !isset($seen_objects[$prop['LINKED_OBJECT']])) {
                     $seen_objects[$prop['LINKED_OBJECT']] = 1;
-                    $sdevice = SQLSelectOne("SELECT ID, LINKED_OBJECT FROM devices WHERE LINKED_OBJECT='" . $prop['LINKED_OBJECT'] . "'");
+                    $sdevice = SQLSelectOne("SELECT ID, LINKED_OBJECT, PARENT_ID FROM devices WHERE LINKED_OBJECT='" . $prop['LINKED_OBJECT'] . "'");
                     if (isset($sdevice['ID'])) {
-                        $linked_devices[] = array('ID' => $sdevice['ID']);
+                        $linked_devices[] = array('ID' => $sdevice['ID'], 'PARENT_ID' => $sdevice['PARENT_ID']);
                     }
                 }
             }
             if (count($linked_devices) > 0) {
+                usort($linked_devices, function ($a,$b) { return (int)($a['PARENT_ID']>$b['PARENT_ID']); });
                 $out['LINKED_DEVICES'] = $linked_devices;
             }
         }
@@ -100,11 +101,11 @@ if ($this->tab == 'data') {
             $payload = json_decode($properties[$i]['COMPONENT_PAYLOAD'], true);
             if (isset($payload['command_topic']) && $payload['command_topic'] != '') {
                 $out['CAN_SET'] = 1;
-                if ($properties[$i]['HA_COMPONENT']=='select' && isset($payload['options'])) {
-                    foreach($payload['options'] as $option) {
-                        $out['SELECT_OPTIONS'][]=array('VALUE'=>$option);
+                if ($properties[$i]['HA_COMPONENT'] == 'select' && isset($payload['options'])) {
+                    foreach ($payload['options'] as $option) {
+                        $out['SELECT_OPTIONS'][] = array('VALUE' => $option);
                     }
-                    $out['CAN_SET_SELECT']=1;
+                    $out['CAN_SET_SELECT'] = 1;
                 }
             }
             foreach ($properties[$i] as $k => $v) {

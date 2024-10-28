@@ -633,17 +633,29 @@ class ha_discovery extends module
         }
         $data = false;
         // find by components
+        /*
         if ($exclude_taken) {
             $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID'] . " AND LINKED_OBJECT=''");
         } else {
             $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
         }
+        */
+        $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
         $definition = array();
+        $definition_unfiltered = array();
         $total = count($components);
         for ($i = 0; $i < $total; $i++) {
-            $definition[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = json_decode($components[$i]['COMPONENT_PAYLOAD'], true);
+            if (!$exclude_taken || $components[$i]['LINKED_OBJECT']=='') {
+                $definition[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = json_decode($components[$i]['COMPONENT_PAYLOAD'], true);
+            }
+            $definition_unfiltered[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = json_decode($components[$i]['COMPONENT_PAYLOAD'], true);
         }
         $device_type = '';
+        if (!$device_type && isset($definition['sensor']['co2'])) {
+            //CO2 sensor
+            $device_type = 'sensor_co2';
+            $data = array($device_type => array('properties' => array('co2' => 'value')));
+        }
         if (!$device_type && isset($definition['binary_sensor']['occupancy'])) {
             //motion sensor
             $device_type = 'motion';
@@ -704,10 +716,10 @@ class ha_discovery extends module
             $device_type = 'sensor_light';
             $data = array($device_type => array('properties' => array('illuminance' => 'value')));
         }
-        if (!$device_type && isset($definition['sensor']['pressure'])) {
-            //pressure sensor
-            $device_type = 'sensor_pressure';
-            $data = array($device_type => array('properties' => array('pressure' => 'value')));
+        if (!$device_type && isset($definition['sensor']['illuminance_raw'])) {
+            //light sensor
+            $device_type = 'sensor_light';
+            $data = array($device_type => array('properties' => array('illuminance_raw' => 'value')));
         }
         if (!$device_type && isset($definition['light']['light']) && isset($definition['light_rgb']['light_rgb'])) {
             //dimmer
@@ -774,6 +786,27 @@ class ha_discovery extends module
                 )
             );
         }
+        if (!$device_type && isset($definition['sensor']['pressure'])) {
+            //pressure sensor
+            $device_type = 'sensor_pressure';
+            $data = array($device_type => array('properties' => array('pressure' => 'value')));
+        }
+        if (!$device_type && isset($definition['sensor']['energy'])) {
+            //power sensor
+            $device_type = 'sensor_power';
+            $data = array($device_type => array('properties' => array('energy' => 'value')));
+        }
+        if (!$device_type && isset($definition['sensor']['current'])) {
+            //current sensor
+            $device_type = 'sensor_current';
+            $data = array($device_type => array('properties' => array('current' => 'value')));
+        }
+        if (!$device_type && isset($definition['sensor']['voltage']) && !isset($definition_unfiltered['sensor']['battery'])) {
+            //voltage sensor
+            $device_type = 'sensor_voltage';
+            $data = array($device_type => array('properties' => array('voltage' => 'value')));
+        }
+
 
         //check if battery operated
         if ($device_type && is_array($data) && isset($definition['sensor']['battery'])) {
