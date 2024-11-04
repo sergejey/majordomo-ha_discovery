@@ -315,6 +315,56 @@ class ha_discovery extends module
                     }
                 }
 
+                if ($component == 'climate' && isset($data['current_temperature_topic'])) {
+                    $new_data = $data;
+                    $new_data['state_topic'] = $data['current_temperature_topic'];
+                    if (isset($data['current_temperature_template'])) {
+                        $new_data['value_template'] = $data['current_temperature_template'];
+                    }
+                    $this->processComponent($device_id, 'climate_temperature', 'climate_temperature', $new_data);
+                }
+                if ($component == 'climate' && isset($data['temperature_state_topic'])) {
+                    $new_data = $data;
+                    $new_data['state_topic'] = $data['temperature_state_topic'];
+                    if (isset($data['temperature_state_template'])) {
+                        $new_data['value_template'] = $data['temperature_state_template'];
+                    }
+                    if (isset($data['temperature_command_topic'])) {
+                        $new_data['command_topic'] = $data['temperature_command_topic'];
+                    }
+                    $this->processComponent($device_id, 'climate_setpoint', 'climate_setpoint', $new_data);
+                }
+                if ($component == 'climate' && isset($data['mode_state_topic'])) {
+                    $new_data = $data;
+                    $new_data['state_topic'] = $data['mode_state_topic'];
+                    if (isset($data['mode_state_template'])) {
+                        $new_data['value_template'] = $data['mode_state_template'];
+                    }
+                    if (isset($data['mode_command_topic'])) {
+                        $new_data['command_topic'] = $data['mode_command_topic'];
+                    }
+                    $this->processComponent($device_id, 'climate_mode', 'climate_mode', $new_data);
+                }
+                if ($component == 'climate' && isset($data['preset_mode_state_topic'])) {
+                    $new_data = $data;
+                    $new_data['state_topic'] = $data['preset_mode_state_topic'];
+                    if (isset($data['preset_mode_value_template'])) {
+                        $new_data['value_template'] = $data['preset_mode_value_template'];
+                    }
+                    if (isset($data['preset_mode_command_topic'])) {
+                        $new_data['command_topic'] = $data['preset_mode_command_topic'];
+                    }
+                    $this->processComponent($device_id, 'climate_preset', 'climate_preset', $new_data);
+                }
+                if ($component == 'climate' && isset($data['action_topic'])) {
+                    $new_data = $data;
+                    $new_data['state_topic'] = $data['action_topic'];
+                    if (isset($data['action_template'])) {
+                        $new_data['value_template'] = $data['action_template'];
+                    }
+                    $this->processComponent($device_id, 'climate_action', 'climate_action', $new_data);
+                }
+
             } else {
                 $this->log("No device data:\n" . json_encode($data, JSON_PRETTY_PRINT), 'error');
                 return false;
@@ -434,15 +484,11 @@ class ha_discovery extends module
 
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Template.php';
 
-        //dprint("Original: $templateString",false);
         $templateString = str_replace("']['", '.', $templateString);
-        //$templateString = str_replace("']",'.',$templateString);
         $templateString = str_replace("['", '.', $templateString);
         $templateString = preg_replace("/'\\]\W/", '', $templateString);
-        //dprint("Parsing: $templateString",false);
 
         $template = new Template($templateString);
-        //$template->withUndefined(new DebugUndefined());
         $value = '';
         try {
             $value = $template->render(array('value_json' => $data));
@@ -496,9 +542,12 @@ class ha_discovery extends module
             $rec['DEVICE_PAYLOAD'] = $device_payload;
         }
         $title = '';
+        if (isset($data['name'])) {
+            $title = $data['name'];
+        }
         if ((!isset($rec['MODEL']) || $rec['MODEL'] == '') && isset($data['model'])) {
             $rec['MODEL'] = $data['model'];
-            $title = $rec['MODEL'];
+            if ($title == '') $title = $rec['MODEL'];
         }
         if ((!isset($rec['MANUFACTURER']) || $rec['MANUFACTURER'] == '') && isset($data['manufacturer'])) {
             $rec['MANUFACTURER'] = $data['manufacturer'];
@@ -617,11 +666,11 @@ class ha_discovery extends module
 
     function checkDeviceType($device_id, $exclude_taken = false)
     {
-
+        if (!$device_id) return false;
         $ha_device = SQLSelectOne("SELECT * FROM ha_devices WHERE ID=" . (int)$device_id);
-        $this->log("Checking device type for " . json_encode($ha_device), 'checkdevicetype');
+        $this->log("Checking device type for " . json_encode($ha_device) . " (device_id: $device_id) " . $_SERVER['REQUEST_URI'], 'checkdevicetype');
 
-        // find by model
+// find by model
         if (!$exclude_taken) {
             $models = array();
             require DIR_MODULES . 'ha_discovery/known_devices.inc.php';
@@ -632,25 +681,40 @@ class ha_discovery extends module
             }
         }
         $data = false;
-        // find by components
+// find by components
         /*
         if ($exclude_taken) {
-            $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID'] . " AND LINKED_OBJECT=''");
+        $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID'] . " AND LINKED_OBJECT=''");
         } else {
-            $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
+        $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
         }
         */
         $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
+        $values = array();
         $definition = array();
         $definition_unfiltered = array();
         $total = count($components);
         for ($i = 0; $i < $total; $i++) {
-            if (!$exclude_taken || $components[$i]['LINKED_OBJECT']=='') {
+            if (!$exclude_taken || $components[$i]['LINKED_OBJECT'] == '') {
                 $definition[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = json_decode($components[$i]['COMPONENT_PAYLOAD'], true);
             }
             $definition_unfiltered[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = json_decode($components[$i]['COMPONENT_PAYLOAD'], true);
+            $values[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = $components[$i]['VALUE'];
         }
         $device_type = '';
+        if (!$device_type && isset($definition['climate_setpoint']['climate_setpoint'])) {
+            //Thermostat
+            $device_type = 'thermostat';
+            $data = array($device_type => array('properties' => array('climate_setpoint' => 'currentTargetValue')));
+            if ($values['climate_setpoint']['climate_setpoint']) {
+                $data[$device_type]['settings']['normalTargetValue'] = $values['climate_setpoint']['climate_setpoint'];
+                $data[$device_type]['settings']['ecoTargetValue'] = (float)($values['climate_setpoint']['climate_setpoint']) - 2;
+            }
+            $data[$device_type]['settings']['status'] = 1;
+            if (isset($definition['climate_temperature']['climate_temperature'])) {
+                $data[$device_type]['properties']['climate_temperature'] = 'value';
+            }
+        }
         if (!$device_type && isset($definition['sensor']['co2'])) {
             //CO2 sensor
             $device_type = 'sensor_co2';
@@ -711,12 +775,12 @@ class ha_discovery extends module
             $data = array($device_type => array('properties' => array('illuminance_lux' => 'value')));
             $data[$device_type]['settings']['unit'] = 'Lux';
         }
-        if (!$device_type && isset($definition['sensor']['illuminance'])) {
+        if (!$device_type && isset($definition['sensor']['illuminance']) && !isset($definition_unfiltered['sensor']['illuminance_lux'])) {
             //light sensor
             $device_type = 'sensor_light';
             $data = array($device_type => array('properties' => array('illuminance' => 'value')));
         }
-        if (!$device_type && isset($definition['sensor']['illuminance_raw'])) {
+        if (!$device_type && isset($definition['sensor']['illuminance_raw']) && !isset($definition_unfiltered['sensor']['illuminance']) && !isset($definition_unfiltered['sensor']['illuminance_lux'])) {
             //light sensor
             $device_type = 'sensor_light';
             $data = array($device_type => array('properties' => array('illuminance_raw' => 'value')));
@@ -763,19 +827,34 @@ class ha_discovery extends module
             );
             $data[$device_type]['properties']['loadType'] = 'light';
         }
-        if (!$device_type && isset($definition['switch']['switch'])) {
-            //light / relay
-            $device_type = 'relay';
+
+        $switch_types = array('switch', 'switch_left', 'switch_right', 'switch_top_left', 'switch_top_right', 'switch_center', 'switch_bottom_left', 'switch_bottom_right');
+        foreach ($switch_types as $switch_type) {
+            if (!$device_type && isset($definition['switch'][$switch_type])) {
+                //light / relay
+                $device_type = 'relay';
+                $data = array(
+                    $device_type => array(
+                        'properties' => array(
+                            $switch_type => 'status',
+                        )
+                    )
+                );
+            }
+        }
+
+        if (!$device_type && isset($definition['sensor']['action'])) {
+            $device_type = 'button';
             $data = array(
                 $device_type => array(
-                    'properties' => array(
-                        'switch' => 'status',
+                    'properties' => array(),
+                    'methods' => array(
+                        'action' => 'pressed'
                     )
                 )
             );
         }
         if (!$device_type && isset($definition['device_automation']['action_single'])) {
-            //light / relay
             $device_type = 'button';
             $data = array(
                 $device_type => array(
