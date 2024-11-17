@@ -811,7 +811,8 @@ class ha_discovery extends module
                     'properties' => array(
                         'light' => 'status',
                         'light_brightness' => 'levelWork'
-                    )
+                    ),
+                    'settings' => array('switchLevel' => 1)
                 )
             );
             $data[$device_type]['settings']['minWork'] = 0;
