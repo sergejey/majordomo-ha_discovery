@@ -574,6 +574,7 @@ class ha_discovery extends module
                 $id = (int)$rec['ID'];
                 $timer_code = "callAPI('/api/module/ha_discovery','GET',array('create_device_id'=>$id));";
                 setTimeOut('ha_discovery_new_device_' . $rec['ID'], $timer_code, 3);
+                setTimeOut('ha_discovery_new_device_' . $rec['ID'] . '_2nd', $timer_code, 8);
                 $this->log("Setting timer: $timer_code", "new_device");
             }
         }
@@ -723,7 +724,12 @@ class ha_discovery extends module
         if (!$device_type && isset($definition['binary_sensor']['occupancy'])) {
             //motion sensor
             $device_type = 'motion';
-            $data = array($device_type => array('properties' => array('occupancy' => 'status')));
+            $data = array(
+                $device_type => array(
+                    'properties' => array('occupancy' => 'status'),
+                    'settings' => array('isPresenceSensor' => 1)
+                )
+            );
         }
         if (!$device_type && isset($definition['binary_sensor']['contact'])) {
             //openclose sensor
