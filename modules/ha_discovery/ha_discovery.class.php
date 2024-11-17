@@ -307,11 +307,11 @@ class ha_discovery extends module
                 if (isset($data['origin'])) unset($data['origin']);
                 $component_id = $this->processComponent($device_id, $component, $object_id, $data);
                 if ($component == 'light' && isset($data['brightness']) && $data['brightness']) {
-                    $brightness_component_id = $this->processComponent($device_id, 'light_brightness', 'light_brightness', $data);
+                    $brightness_component_id = $this->processComponent($device_id, 'light_brightness', $object_id . '_brightness', $data);
                 }
                 if ($component == 'light' && isset($data['supported_color_modes']) && is_array($data['supported_color_modes'])) {
                     foreach ($data['supported_color_modes'] as $color_mode) {
-                        $this->processComponent($device_id, 'light_' . $color_mode, 'light_' . $color_mode, $data);
+                        $this->processComponent($device_id, 'light_' . $color_mode, $object_id . '_' . $color_mode, $data);
                     }
                 }
 
