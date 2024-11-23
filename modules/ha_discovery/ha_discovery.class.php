@@ -473,7 +473,15 @@ class ha_discovery extends module
                 $new_value = $value;
             }
 
+            if ($component['LINKED_PROPERTY']) {
+                $old_linked_value = gg($component['LINKED_OBJECT'] . '.' . $component['LINKED_PROPERTY']);
+            } else {
+                $old_linked_value = $old_value;
+            }
+
+
             if ($component['VALUE'] != $old_value
+                || $component['VALUE'] != $old_linked_value
                 || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)
                 || $force
             ) {
