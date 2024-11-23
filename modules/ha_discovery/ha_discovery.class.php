@@ -163,6 +163,11 @@ class ha_discovery extends module
 
             $this->saveConfig();
             setGlobal('cycle_ha_discovery', 'restart');
+
+            if (!$this->config['DEBUG_MODE']) {
+                SQLExec("TRUNCATE TABLE ha_history;");
+            }
+
             $this->redirect("?");
         }
         if (isset($this->data_source) && !$_GET['data_source'] && !$_POST['data_source']) {
@@ -437,6 +442,25 @@ class ha_discovery extends module
         }
         SQLUpdate('ha_components', $component);
 
+        if (isset($this->config['DEBUG_MODE']) && $this->config['DEBUG_MODE']) {
+            $hist = array();
+            $hist['HA_DEVICE_ID'] = $component['HA_DEVICE_ID'];
+            $hist['HA_COMPONENT_ID'] = $component['ID'];
+            $hist['TOPIC'] = $component['MQTT_TOPIC'];
+            $hist['DESTINATION'] = 0;
+            $hist['DATA_PAYLOAD'] = $component['DATA_PAYLOAD'];
+            $hist['VALUE'] = $component['VALUE'];
+            $hist['UPDATED'] = date('Y-m-d H:i:s');;
+            SQLInsert('ha_history', $hist);
+
+            $keep_total = 20;
+            $tmp = SQLSelect("SELECT ID FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " ORDER BY ID DESC LIMIT $keep_total");
+            if (count($tmp) == $keep_total) {
+                SQLExec("DELETE FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " AND ID<" . $tmp[$keep_total - 1]['ID']);
+            }
+
+        }
+
         if ($component['LINKED_OBJECT'] != '') {
             $value = $component['VALUE'];
             $value = strtolower($value);
@@ -464,6 +488,7 @@ class ha_discovery extends module
             }
 
         }
+
 
     }
 
@@ -1056,11 +1081,30 @@ class ha_discovery extends module
         if (is_array($data)) {
             $send = array('v' => json_encode($data, JSON_NUMERIC_CHECK));
             $this->log("Sending to $command_topic: " . $send['v'], 'set');
-            addToOperationsQueue('ha_discovery_queue', $command_topic, json_encode($send, JSON_NUMERIC_CHECK), true);
         } else {
             $send = array('v' => $data);
             $this->log("Sending to $command_topic: " . (is_bool($send['v']) ? ($send['v'] ? 'true' : 'false') : $send['v']), 'set');
-            addToOperationsQueue('ha_discovery_queue', $command_topic, json_encode($send, JSON_NUMERIC_CHECK), true);
+        }
+
+        $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
+        addToOperationsQueue('ha_discovery_queue', $command_topic, $payload_to_send, true);
+
+        if (isset($this->config['DEBUG_MODE']) && $this->config['DEBUG_MODE']) {
+            $hist = array();
+            $hist['HA_DEVICE_ID'] = $component_rec['HA_DEVICE_ID'];
+            $hist['HA_COMPONENT_ID'] = $component_rec['ID'];
+            $hist['DESTINATION'] = 1;
+            $hist['TOPIC'] = $command_topic;
+            $hist['DATA_PAYLOAD'] = $send['v'];
+            $hist['VALUE'] = $value;
+            $hist['UPDATED'] = date('Y-m-d H:i:s');
+            SQLInsert('ha_history', $hist);
+
+            $keep_total = 20;
+            $tmp = SQLSelect("SELECT ID FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " ORDER BY ID DESC LIMIT $keep_total");
+            if (count($tmp) == $keep_total) {
+                SQLExec("DELETE FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " AND ID<" . $tmp[$keep_total - 1]['ID']);
+            }
         }
 
     }
@@ -1159,6 +1203,15 @@ class ha_discovery extends module
  ha_components: COMPONENT_PAYLOAD text
  ha_components: DATA_PAYLOAD text
  ha_components: UPDATED datetime
+ 
+ ha_history: ID int(10) unsigned NOT NULL auto_increment
+ ha_history: HA_DEVICE_ID int(10) NOT NULL DEFAULT '0'
+ ha_history: HA_COMPONENT_ID int(10) NOT NULL DEFAULT '0'
+ ha_history: DESTINATION int(3) NOT NULL DEFAULT '0'
+ ha_history: TOPIC varchar(255) NOT NULL DEFAULT ''
+ ha_history: VALUE varchar(255) NOT NULL DEFAULT ''
+ ha_history: DATA_PAYLOAD text
+ ha_history: UPDATED datetime
  
 EOD;
         parent::dbInstall($data);

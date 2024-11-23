@@ -2,22 +2,21 @@
  let deviceTimer=0;
  function reloadDeviceData() {
   clearTimeout(deviceTimer);
-  let url="?id=<#ID#>&view_mode=<#VIEW_MODE#>&tab=<#TAB#>&ajax=1";
+  let url="?id=<#ID#>&view_mode=<#VIEW_MODE#>&tab=<#TAB#>&component_id=<#COMPONENT_ID#>&ajax=1";
   $.ajax({
    url: url
   }).done(function(data) {
    if (typeof data == 'object') {
-    for(let i=0;i<data.length;i++) {
-     //alert(data[i].TITLE);
-     var oldValue=$('#component'+data[i].ID+'_value').html();
-     $('#component'+data[i].ID+'_value').html(data[i].VALUE);
-     $('#component'+data[i].ID+'_updated').html(data[i].UPDATED);
-     if (data[i].VALUE!=oldValue) {
-      $('#component'+data[i].ID+'_value').stop().fadeTo(100, 0.1).fadeTo(200, 1.0);
-      $('#component'+data[i].ID+'_updated').stop().fadeTo(100, 0.1).fadeTo(200, 1.0);
+    for(let i=0;i<data['PROPERTIES'].length;i++) {
+     var oldValue=$('#component'+data['PROPERTIES'][i].ID+'_value').html();
+     $('#component'+data['PROPERTIES'][i].ID+'_value').html(data['PROPERTIES'][i].VALUE);
+     $('#component'+data['PROPERTIES'][i].ID+'_updated').html(data['PROPERTIES'][i].UPDATED);
+     if (data['PROPERTIES'][i].VALUE!=oldValue) {
+      $('#component'+data['PROPERTIES'][i].ID+'_value').stop().fadeTo(100, 0.1).fadeTo(200, 1.0);
+      $('#component'+data['PROPERTIES'][i].ID+'_updated').stop().fadeTo(100, 0.1).fadeTo(200, 1.0);
      }
-
     }
+    $('#history').html(data['HISTORY']);
    }
    deviceTimer=setTimeout('reloadDeviceData();',2000);
   });
@@ -194,6 +193,9 @@
   </p>
   [#endif CAN_SET#]
   [#endif COMPONENT_ID#]
+
+  <div id="history">[#HISTORY#]</div>
+
  </div>
 </div>
 

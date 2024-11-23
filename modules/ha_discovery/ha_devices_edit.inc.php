@@ -136,11 +136,39 @@ if ($this->tab == 'data') {
         }
     }
     $out['PROPERTIES'] = $properties;
+
+    $history_qry = "ha_history.HA_DEVICE_ID=".$rec['ID'];
+    if ($out['COMPONENT_ID']) {
+        $history_qry.=" AND ha_history.HA_COMPONENT_ID=".(int)$out['COMPONENT_ID'];
+    }
+    $history = SQLSelect("SELECT ha_history.*, ha_components.HA_OBJECT, ha_components.HA_COMPONENT FROM ha_history LEFT JOIN ha_components ON ha_history.HA_COMPONENT_ID=ha_components.ID  WHERE $history_qry ORDER BY ha_history.UPDATED DESC, ha_history.ID DESC LIMIT 20");
+    $total = count($history);
+    for($i=0;$i<$total;$i++) {
+        $out['HISTORY'].="<div>";
+        if ($history[$i]['DESTINATION']==1) {
+            $out['HISTORY'].= '<i class="glyphicon glyphicon-export" style="color:blue"></i> ';
+        } else {
+            $out['HISTORY'].= '<i class="glyphicon glyphicon-import" style="color:green"></i> ';
+        }
+        $out['HISTORY'].=$history[$i]['UPDATED'].' <b>'.$history[$i]['HA_OBJECT'].' ('.$history[$i]['HA_COMPONENT'].')</b>';
+        $out['HISTORY'].="<br/><small>";
+        $out['HISTORY'].="Topic: ".$history[$i]['TOPIC']."<br/>";
+        if ($history[$i]['DESTINATION']==1) {
+            //out
+            $out['HISTORY'].= '<b>'.$history[$i]['VALUE'] . '</b> &xrarr; '.htmlspecialchars($history[$i]['DATA_PAYLOAD'])."<br/>";
+        } else {
+            //in
+            $out['HISTORY'].=  ''.htmlspecialchars($history[$i]['DATA_PAYLOAD']).' &xrarr; <b>'.$history[$i]['VALUE']."</b><br/>";
+        }
+        $out['HISTORY'].="</small></div>&nbsp;";
+    }
+
     if (gr('ajax')) {
         header("Content-type:application/json");
-        echo json_encode($properties, JSON_NUMERIC_CHECK);
+        echo json_encode($out, JSON_NUMERIC_CHECK);
         exit;
     }
+
 }
 if (is_array($rec)) {
     foreach ($rec as $k => $v) {
