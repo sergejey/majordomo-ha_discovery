@@ -66,7 +66,27 @@ if ($save_qry) {
     $session->data['ha_devices_qry'] = $qry;
 }
 if (!$qry) $qry = "1";
-$sortby_ha_devices = "ha_devices.TITLE, ha_devices.ID";
+
+$sortby = gr('sortby');
+
+if (!$sortby && isset($session->data['ha_sortby'])) {
+    $sortby = $session->data['ha_sortby'];
+} elseif ($sortby) {
+    $session->data['ha_sortby'] = $sortby;
+}
+
+if ($sortby == 'ID') {
+    $sortby_ha_devices = "ha_devices.ID DESC";
+} elseif ($sortby == 'IDENTIFIER') {
+    $sortby_ha_devices = "ha_devices.IDENTIFIER";
+} elseif ($sortby == 'UPDATED') {
+    $sortby_ha_devices = "ha_devices.UPDATED DESC";
+} elseif ($sortby == 'TITLE') {
+    $sortby_ha_devices = "ha_devices.TITLE, ha_devices.ID";
+} else {
+    $sortby_ha_devices = "ha_devices.TITLE, ha_devices.ID";
+}
+
 $out['SORTBY'] = $sortby_ha_devices;
 // SEARCH RESULTS
 $res = SQLSelect("SELECT * FROM ha_devices WHERE $qry ORDER BY " . $sortby_ha_devices);
@@ -74,12 +94,12 @@ if ($res[0]['ID']) {
     //paging($res, 100, $out); // search result paging
     $total = count($res);
     for ($i = 0; $i < $total; $i++) {
+        $res[$i]['DEVICE']='';
         // some action for every record if required
         $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . $res[$i]['ID'] . " ORDER BY HA_OBJECT");
         $seen_device = array();
         foreach ($components as $k => $v) {
             $res[$i]['DATA'] .= $v['HA_OBJECT'] . ': ' . $v['VALUE'] . '; ';
-
             if ($v['LINKED_OBJECT'] != '') {
                 $dev_rec = SQLSelectOne("SELECT ID, TITLE FROM devices WHERE LINKED_OBJECT='" . $v['LINKED_OBJECT'] . "'");
                 if ($dev_rec['ID']) {
@@ -91,8 +111,9 @@ if ($res[0]['ID']) {
 
                 }
             }
-
         }
+        $updated_tm = strtotime($res[$i]['UPDATED']);
+        $res[$i]['UPDATED'] = getPassedText($updated_tm);
     }
     $out['RESULT'] = $res;
 }

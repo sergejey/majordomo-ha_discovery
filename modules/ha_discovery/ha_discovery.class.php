@@ -481,7 +481,7 @@ class ha_discovery extends module
 
 
             if ($component['VALUE'] != $old_value
-                || $component['VALUE'] != $old_linked_value
+                || $new_value != $old_linked_value
                 || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)
                 || $force
             ) {
@@ -764,6 +764,17 @@ class ha_discovery extends module
                 )
             );
         }
+
+        if (!$device_type && isset($definition['sensor']['action']) && isset($definition['sensor']['angle'])) {
+            //vibration sensor
+            $device_type = 'motion';
+            $data = array(
+                $device_type => array(
+                    'methods' => array('action' => 'motionDetected')
+                )
+            );
+        }
+
         if (!$device_type && isset($definition['binary_sensor']['contact'])) {
             //openclose sensor
             $device_type = 'openclose';
@@ -868,9 +879,33 @@ class ha_discovery extends module
             $data[$device_type]['properties']['loadType'] = 'light';
         }
 
-        $switch_types = array('switch', 'switch_left', 'switch_right', 'switch_top_left', 'switch_top_right', 'switch_center', 'switch_bottom_left', 'switch_bottom_right');
+        $switch_types = array(
+            'switch',
+            'switch_1',
+            'switch_2',
+            'switch_3',
+            'switch_4',
+            'switch_l1',
+            'switch_l2',
+            'switch_l3',
+            'switch_l4',
+            'switch_left',
+            'switch_right',
+            'switch_top_left',
+            'switch_top_right',
+            'switch_center',
+            'switch_bottom_left',
+            'switch_bottom_right');
+
         foreach ($switch_types as $switch_type) {
             if (!$device_type && isset($definition['switch'][$switch_type])) {
+                if ($switch_type == 'switch') {
+                    // skipping 'switch' if there are any other types of switches
+                    $result = array_intersect_key($definition_unfiltered['switch'], array_flip($switch_types));
+                    if (count($result) > 1) {
+                        continue;
+                    }
+                }
                 //light / relay
                 $device_type = 'relay';
                 $data = array(
@@ -894,6 +929,7 @@ class ha_discovery extends module
                 )
             );
         }
+
         if (!$device_type && isset($definition['device_automation']['action_single'])) {
             $device_type = 'button';
             $data = array(
@@ -973,7 +1009,10 @@ class ha_discovery extends module
                         }
                     }
                 }
-                $options = array('TITLE' => $new_title, "PARENT_ID" => $parent_simple_device_id);
+                $options = array('TITLE' => $new_title);
+                if ($type != 'relay') {
+                    $options['PARENT_ID'] = $parent_simple_device_id;
+                }
                 $this->log("Adding new device: " . json_encode($options), 'new_device');
                 if ($devices_module->addDevice($type, $options)) {
                     $added_device = SQLSelectOne("SELECT ID FROM devices WHERE TITLE='" . DBSafe($new_title) . "'");
@@ -1119,12 +1158,14 @@ class ha_discovery extends module
 
     function propertySetHandle($object, $property, $value)
     {
+        $this->log("propertySetHandle($object, $property, $value)", 'set');
         $this->getConfig();
         $table = 'ha_components';
         $properties = SQLSelect("SELECT ID FROM $table WHERE LINKED_OBJECT LIKE '" . DBSafe($object) . "' AND LINKED_PROPERTY LIKE '" . DBSafe($property) . "'");
         $total = count($properties);
         if ($total) {
             for ($i = 0; $i < $total; $i++) {
+                $this->log("Setting value $value to ID " . $properties[$i]['ID'], 'set');
                 $this->setValue($properties[$i]['ID'], $value);
             }
         }

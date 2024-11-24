@@ -1,16 +1,29 @@
 <script type="text/javascript">
  let deviceTimer=0;
  let totalDevices=0;
+ let oldLinkedDevices=0;
  function reloadDeviceData() {
   let url="?ajax=1&search=[#SEARCH_URL#]";
   $.ajax({
    url: url
   }).done(function(data) {
    if (typeof data == 'object') {
+    let linkedDevices = 0;
     for(let i=0;i<data.length;i++) {
      $('#dev'+data[i].ID+'_updated').html(data[i].UPDATED);
      $('#dev'+data[i].ID+'_data').html(data[i].DATA);
+     if (data[i].DEVICE!='') {
+      linkedDevices++;
+     }
     }
+
+    if (oldLinkedDevices==0) oldLinkedDevices=linkedDevices;
+
+    if (oldLinkedDevices!=linkedDevices) {
+     let url="?search=[#SEARCH_URL#]";
+     window.location.href=url;
+    }
+
     if (totalDevices==0) {
      totalDevices = data.length;
     } else {
@@ -57,17 +70,19 @@
 <table class="table table-striped">
  <thead>
  <tr>
-  <th>ID</th>
-  <th><#LANG_TITLE#></th>
+  <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=ID">ID</a></th>
+  <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=IDENTIFIER">ADDR</a></th>
+  <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=TITLE"><#LANG_TITLE#></a></th>
   <th><#LANG_DEVICE#></th>
   <th>Manufacturer - Model</th>
   <th><#LANG_DATA#></th>
-  <th><#LANG_UPDATED#></th>
+  <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=UPDATED"><#LANG_UPDATED#></a></th>
  </tr>
  </thead>
 <tbody>
 [#begin RESULT#]
 <tr>
+ <td>[#ID#]</td>
  <td><a href="?data_source=<#DATA_SOURCE#>&view_mode=edit_ha_devices&id=[#ID#]&tab=data">[#IDENTIFIER#]</a></td>
  <td><b>[#TITLE#]</a></b></td>
  <td>[#DEVICE#]</td>

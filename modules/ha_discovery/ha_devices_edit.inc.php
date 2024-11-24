@@ -150,7 +150,11 @@ if ($this->tab == 'data') {
         } else {
             $out['HISTORY'].= '<i class="glyphicon glyphicon-import" style="color:green"></i> ';
         }
-        $out['HISTORY'].=$history[$i]['UPDATED'].' <b>'.$history[$i]['HA_OBJECT'].' ('.$history[$i]['HA_COMPONENT'].')</b>';
+
+        $updated_tm = strtotime($history[$i]['UPDATED']);
+        $diff_str = getPassedText($updated_tm);
+
+        $out['HISTORY'].=$diff_str.' &mdash; <b>'.$history[$i]['HA_OBJECT'].' ('.$history[$i]['HA_COMPONENT'].')</b>';
         $out['HISTORY'].="<br/><small>";
         $out['HISTORY'].="Topic: ".$history[$i]['TOPIC']."<br/>";
         if ($history[$i]['DESTINATION']==1) {
