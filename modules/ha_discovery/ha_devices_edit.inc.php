@@ -89,7 +89,9 @@ if ($this->tab == 'data') {
                 }
             }
             if (count($linked_devices) > 0) {
-                usort($linked_devices, function ($a,$b) { return (int)($a['PARENT_ID']>$b['PARENT_ID']); });
+                usort($linked_devices, function ($a, $b) {
+                    return (int)($a['PARENT_ID'] > $b['PARENT_ID']);
+                });
                 $out['LINKED_DEVICES'] = $linked_devices;
             }
         }
@@ -122,6 +124,24 @@ if ($this->tab == 'data') {
                 $properties[$i]['LINKED_OBJECT'] = gr('linked_object', 'trim');
                 $properties[$i]['LINKED_PROPERTY'] = gr('linked_property', 'trim');
                 $properties[$i]['LINKED_METHOD'] = gr('linked_method', 'trim');
+                $write_code = gr('write_code', 'trim');
+                if ($write_code != '') {
+                    $errors = php_syntax_error($write_code);
+                    if (!$errors) {
+                        $properties[$i]['WRITE_CODE'] = $write_code;
+                    }
+                } else {
+                    $properties[$i]['WRITE_CODE'] = '';
+                }
+                $read_code = gr('read_code', 'trim');
+                if ($read_code != '') {
+                    $errors = php_syntax_error($read_code);
+                    if (!$errors) {
+                        $properties[$i]['READ_CODE'] = $read_code;
+                    }
+                } else {
+                    $properties[$i]['READ_CODE'] = '';
+                }
                 SQLUpdate('ha_components', $properties[$i]);
                 if ($properties[$i]['LINKED_OBJECT'] && $properties[$i]['LINKED_PROPERTY']) {
                     addLinkedProperty($properties[$i]['LINKED_OBJECT'], $properties[$i]['LINKED_PROPERTY'], $this->name);
@@ -134,37 +154,38 @@ if ($this->tab == 'data') {
                 $this->redirect("?id=" . $rec['ID'] . "&view_mode=" . $this->view_mode . "&tab=" . $this->tab . "&component_id=" . $component_id . "&ok=1");
             }
         }
+        $properties[$i]['UPDATED']=getPassedText(strtotime($properties[$i]['UPDATED']));
     }
     $out['PROPERTIES'] = $properties;
 
-    $history_qry = "ha_history.HA_DEVICE_ID=".$rec['ID'];
+    $history_qry = "ha_history.HA_DEVICE_ID=" . $rec['ID'];
     if ($out['COMPONENT_ID']) {
-        $history_qry.=" AND ha_history.HA_COMPONENT_ID=".(int)$out['COMPONENT_ID'];
+        $history_qry .= " AND ha_history.HA_COMPONENT_ID=" . (int)$out['COMPONENT_ID'];
     }
     $history = SQLSelect("SELECT ha_history.*, ha_components.HA_OBJECT, ha_components.HA_COMPONENT FROM ha_history LEFT JOIN ha_components ON ha_history.HA_COMPONENT_ID=ha_components.ID  WHERE $history_qry ORDER BY ha_history.UPDATED DESC, ha_history.ID DESC LIMIT 20");
     $total = count($history);
-    for($i=0;$i<$total;$i++) {
-        $out['HISTORY'].="<div>";
-        if ($history[$i]['DESTINATION']==1) {
-            $out['HISTORY'].= '<i class="glyphicon glyphicon-export" style="color:blue"></i> ';
+    for ($i = 0; $i < $total; $i++) {
+        $out['HISTORY'] .= "<div>";
+        if ($history[$i]['DESTINATION'] == 1) {
+            $out['HISTORY'] .= '<i class="glyphicon glyphicon-export" style="color:blue"></i> ';
         } else {
-            $out['HISTORY'].= '<i class="glyphicon glyphicon-import" style="color:green"></i> ';
+            $out['HISTORY'] .= '<i class="glyphicon glyphicon-import" style="color:green"></i> ';
         }
 
         $updated_tm = strtotime($history[$i]['UPDATED']);
         $diff_str = getPassedText($updated_tm);
 
-        $out['HISTORY'].=$diff_str.' &mdash; <b>'.$history[$i]['HA_OBJECT'].' ('.$history[$i]['HA_COMPONENT'].')</b>';
-        $out['HISTORY'].="<br/><small>";
-        $out['HISTORY'].="Topic: ".$history[$i]['TOPIC']."<br/>";
-        if ($history[$i]['DESTINATION']==1) {
+        $out['HISTORY'] .= $diff_str . ' &mdash; <b>' . $history[$i]['HA_OBJECT'] . ' (' . $history[$i]['HA_COMPONENT'] . ')</b>';
+        $out['HISTORY'] .= "<br/><small>";
+        $out['HISTORY'] .= "Topic: " . $history[$i]['TOPIC'] . "<br/>";
+        if ($history[$i]['DESTINATION'] == 1) {
             //out
-            $out['HISTORY'].= '<b>'.$history[$i]['VALUE'] . '</b> &xrarr; '.htmlspecialchars($history[$i]['DATA_PAYLOAD'])."<br/>";
+            $out['HISTORY'] .= '<b>' . $history[$i]['VALUE'] . '</b> &xrarr; ' . htmlspecialchars($history[$i]['DATA_PAYLOAD']) . "<br/>";
         } else {
             //in
-            $out['HISTORY'].=  ''.htmlspecialchars($history[$i]['DATA_PAYLOAD']).' &xrarr; <b>'.$history[$i]['VALUE']."</b><br/>";
+            $out['HISTORY'] .= '' . htmlspecialchars($history[$i]['DATA_PAYLOAD']) . ' &xrarr; <b>' . $history[$i]['VALUE'] . "</b><br/>";
         }
-        $out['HISTORY'].="</small></div>&nbsp;";
+        $out['HISTORY'] .= "</small></div>&nbsp;";
     }
 
     if (gr('ajax')) {

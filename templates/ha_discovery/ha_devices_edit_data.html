@@ -145,6 +145,22 @@
    [#module name="linkedobject" object_field="linked_object" property_field="linked_property" method_field="linked_method"#]
 
    <div class="form-group">
+    <label><a href="#" onclick="$('#read_code_div').toggle();return false;"><#LANG_CODE#> (read processing)</a></label>
+    <div id="read_code_div" [#if COMPONENT_READ_CODE=""#] style="display:none"[#endif#]>
+     <textarea name="read_code" class="form-control" rows="4">[#COMPONENT_READ_CODE#]</textarea>
+     <div class="help-block">You can use: $value, $linked_object, $linked_property</div>
+    </div>
+   </div>
+
+   <div class="form-group">
+    <label><a href="#" onclick="$('#write_code_div').toggle();return false;"><#LANG_CODE#> (write processing)</a></label>
+    <div id="write_code_div" [#if COMPONENT_WRITE_CODE=""#] style="display:none"[#endif#]>
+     <textarea name="write_code" class="form-control" rows="4">[#COMPONENT_WRITE_CODE#]</textarea>
+     <div class="help-block">You can use: $value, $linked_object, $linked_property</div>
+    </div>
+   </div>
+
+   <div class="form-group">
     <label><#LANG_UPDATED#>:</label>
     <div class="controls">
      <input type="text" class="form-control" value="[#COMPONENT_UPDATED#]" disabled>

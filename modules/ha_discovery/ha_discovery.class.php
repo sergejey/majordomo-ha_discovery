@@ -461,36 +461,41 @@ class ha_discovery extends module
 
         }
 
-        if ($component['LINKED_OBJECT'] != '') {
+        $linked_object = $component['LINKED_OBJECT'];
+        $linked_property = $component['LINKED_PROPERTY'];
+        if ($linked_object) {
             $value = $component['VALUE'];
             $value = strtolower($value);
 
             if ($value == 'false' || $value == 'off' || $value == 'no' || $value == 'open' || $value == 'offline') {
-                $new_value = 0;
+                $value = 0;
             } elseif ($value == 'true' || $value == 'on' || $value == 'yes' || $value == 'close' || $value == 'online') {
-                $new_value = 1;
-            } else {
-                $new_value = $value;
+                $value = 1;
             }
 
-            if ($component['LINKED_PROPERTY']) {
-                $old_linked_value = gg($component['LINKED_OBJECT'] . '.' . $component['LINKED_PROPERTY']);
+            if ($component['READ_CODE'] != '') {
+                setEvalCode($component['READ_CODE']);
+                eval($component['READ_CODE']);
+                setEvalCode();
+            }
+
+            if ($linked_property) {
+                $old_linked_value = gg($linked_object . '.' . $linked_property);
             } else {
                 $old_linked_value = $old_value;
             }
 
-
             if ($component['VALUE'] != $old_value
-                || $new_value != $old_linked_value
+                || $value != $old_linked_value
                 || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)
                 || $force
             ) {
-                if ($component['LINKED_PROPERTY']) {
-                    setGlobal($component['LINKED_OBJECT'] . '.' . $component['LINKED_PROPERTY'], $new_value, array($this->name => '0'));
+                if ($linked_property) {
+                    setGlobal($linked_object . '.' . $linked_property, $value, array($this->name => '0'));
                 }
                 if ($component['LINKED_METHOD'] && ($component['HA_COMPONENT'] != 'device_automation' || $component['VALUE'] == 1)) {
-                    callMethod($component['LINKED_OBJECT'] . '.' . $component['LINKED_METHOD'], array(
-                        'VALUE' => $new_value, 'NEW_VALUE' => $new_value, 'TITLE' => $component['HA_OBJECT']
+                    callMethod($linked_object . '.' . $component['LINKED_METHOD'], array(
+                        'VALUE' => $value, 'NEW_VALUE' => $value, 'TITLE' => $component['HA_OBJECT']
                     ));
                 }
             }
@@ -670,7 +675,13 @@ class ha_discovery extends module
                         continue;
                     }
                     $prop['LINKED_OBJECT'] = $linked_object;
-                    $prop['LINKED_PROPERTY'] = $v;
+                    if (is_array($v)) {
+                        foreach ($v as $key => $value) {
+                            $prop[$key] = $value;
+                        }
+                    } else {
+                        $prop['LINKED_PROPERTY'] = $v;
+                    }
                     SQLUpdate('ha_components', $prop);
                     addLinkedProperty($prop['LINKED_OBJECT'], $prop['LINKED_PROPERTY'], $this->name);
                     if ($prop['VALUE'] != '') {
@@ -747,6 +758,13 @@ class ha_discovery extends module
             $data[$device_type]['settings']['status'] = 1;
             if (isset($definition['climate_temperature']['climate_temperature'])) {
                 $data[$device_type]['properties']['climate_temperature'] = 'value';
+            }
+            if (isset($definition['climate_mode']['climate_mode'])) {
+                $data[$device_type]['properties']['climate_mode'] = array(
+                    'LINKED_PROPERTY'=>'disabled',
+                    'READ_CODE'=>'if ($value=="off") $value=1; else $value=0;',
+                    'WRITE_CODE'=>'if ($value) $value="off"; else $value=gg($linked_object.".ncno")?"cool":"heat";'
+                );
             }
         }
         if (!$device_type && isset($definition['sensor']['co2'])) {
@@ -1161,11 +1179,20 @@ class ha_discovery extends module
         $this->log("propertySetHandle($object, $property, $value)", 'set');
         $this->getConfig();
         $table = 'ha_components';
-        $properties = SQLSelect("SELECT ID FROM $table WHERE LINKED_OBJECT LIKE '" . DBSafe($object) . "' AND LINKED_PROPERTY LIKE '" . DBSafe($property) . "'");
+        $properties = SQLSelect("SELECT ID, LINKED_OBJECT, LINKED_PROPERTY, WRITE_CODE FROM $table WHERE LINKED_OBJECT LIKE '" . DBSafe($object) . "' AND LINKED_PROPERTY LIKE '" . DBSafe($property) . "'");
         $total = count($properties);
+        $original_value = $value;
         if ($total) {
             for ($i = 0; $i < $total; $i++) {
+                $value = $original_value;
+                $linked_object = $properties[$i]['LINKED_OBJECT'];
+                $linked_property = $properties[$i]['LINKED_PROPERTY'];
                 $this->log("Setting value $value to ID " . $properties[$i]['ID'], 'set');
+                if ($properties[$i]['WRITE_CODE'] != '') {
+                    setEvalCode($properties[$i]['WRITE_CODE']);
+                    eval($properties[$i]['WRITE_CODE']);
+                    setEvalCode();
+                }
                 $this->setValue($properties[$i]['ID'], $value);
             }
         }
@@ -1251,6 +1278,8 @@ class ha_discovery extends module
  ha_components: MQTT_TOPIC varchar(255) NOT NULL DEFAULT '' 
  ha_components: COMPONENT_PAYLOAD text
  ha_components: DATA_PAYLOAD text
+ ha_components: READ_CODE text
+ ha_components: WRITE_CODE text
  ha_components: UPDATED datetime
  
  ha_history: ID int(10) unsigned NOT NULL auto_increment
