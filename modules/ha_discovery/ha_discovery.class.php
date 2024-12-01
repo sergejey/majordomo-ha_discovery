@@ -150,6 +150,7 @@ class ha_discovery extends module
         $out['BASE_TOPIC'] = $this->config['BASE_TOPIC'];
         $out['DEBUG_MODE'] = $this->config['DEBUG_MODE'];
         $out['CREATE_DEVICES_AUTOMATICALLY'] = isset($this->config['CREATE_DEVICES_AUTOMATICALLY']) ? $this->config['CREATE_DEVICES_AUTOMATICALLY'] : false;
+        $out['UNPAIR_DEVICES_AUTOMATICALLY'] = isset($this->config['UNPAIR_DEVICES_AUTOMATICALLY']) ? $this->config['UNPAIR_DEVICES_AUTOMATICALLY'] : false;
 
         if ($this->view_mode == 'update_settings') {
             $this->config['MQTT_HOST'] = gr('mqtt_host', 'trim');
@@ -160,6 +161,7 @@ class ha_discovery extends module
             $this->config['BASE_TOPIC'] = gr('base_topic');
             $this->config['DEBUG_MODE'] = gr('debug_mode', 'int');
             $this->config['CREATE_DEVICES_AUTOMATICALLY'] = gr('create_devices_automatically', 'int');
+            $this->config['UNPAIR_DEVICES_AUTOMATICALLY'] = gr('unpair_devices_automatically', 'int');
 
             $this->saveConfig();
             setGlobal('cycle_ha_discovery', 'restart');
@@ -182,6 +184,10 @@ class ha_discovery extends module
             }
             if ($this->view_mode == 'delete_ha_devices') {
                 $this->delete_ha_devices($this->id);
+                $this->redirect("?data_source=ha_devices");
+            }
+            if ($this->view_mode == 'unlink_ha_devices') {
+                $this->unlink_ha_devices($this->id);
                 $this->redirect("?data_source=ha_devices");
             }
         }
@@ -761,9 +767,9 @@ class ha_discovery extends module
             }
             if (isset($definition['climate_mode']['climate_mode'])) {
                 $data[$device_type]['properties']['climate_mode'] = array(
-                    'LINKED_PROPERTY'=>'disabled',
-                    'READ_CODE'=>'if ($value=="off") $value=1; else $value=0;',
-                    'WRITE_CODE'=>'if ($value) $value="off"; else $value=gg($linked_object.".ncno")?"cool":"heat";'
+                    'LINKED_PROPERTY' => 'disabled',
+                    'READ_CODE' => 'if ($value=="off") $value=1; else $value=0;',
+                    'WRITE_CODE' => 'if ($value) $value="off"; else $value=gg($linked_object.".ncno")?"cool":"heat";'
                 );
             }
         }
@@ -1034,6 +1040,7 @@ class ha_discovery extends module
                 $this->log("Adding new device: " . json_encode($options), 'new_device');
                 if ($devices_module->addDevice($type, $options)) {
                     $added_device = SQLSelectOne("SELECT ID FROM devices WHERE TITLE='" . DBSafe($new_title) . "'");
+                    SQLExec("UPDATE ha_devices SET SDEVICE_ID=" . (int)$added_device['ID'] . " WHERE SDEVICE_ID=0 AND ID=" . (int)$device_id);
                     $this->linkDevice($device_id, $added_device['ID'], $exclude_taken);
                     if (!$parent_simple_device_id) $parent_simple_device_id = $added_device['ID'];
                 }
@@ -1079,6 +1086,27 @@ class ha_discovery extends module
         require(dirname(__FILE__) . '/ha_devices_edit.inc.php');
     }
 
+    function unlink_ha_devices($id)
+    {
+        $rec = SQLSelectOne("SELECT * FROM ha_devices WHERE ID='$id'");
+        $this->log('Unlinking ha_device: ' . json_encode($rec, JSON_PRETTY_PRINT), 'delete');
+        $permit_joins = SQLSelect("SELECT ha_devices.*, ha_components.ID as HA_COMPONENT_ID, ha_components.COMPONENT_PAYLOAD FROM ha_components, ha_devices WHERE ha_components.HA_DEVICE_ID=ha_devices.ID AND (HA_OBJECT='permit_join' OR HA_OBJECT LIKE '%PermitJoin') ORDER BY ha_devices.TITLE");
+        if (isset($permit_joins[0])) {
+            $total = count($permit_joins);
+            for ($i = 0; $i < $total; $i++) {
+                $c_payload = json_decode($permit_joins[$i]['COMPONENT_PAYLOAD'], true);
+                if (isset($c_payload['state_topic'])) {
+                    $topic = $c_payload['state_topic'] . '/force_remove';
+                    $identifier = $rec['IDENTIFIER'];
+                    $send = array('v' => $identifier);
+                    $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
+                    addToOperationsQueue('ha_discovery_queue', $topic, $payload_to_send, true);
+                }
+            }
+        }
+        $this->delete_ha_devices($rec['ID']);
+    }
+
     /**
      * ha_devices delete record
      *
@@ -1087,6 +1115,7 @@ class ha_discovery extends module
     function delete_ha_devices($id)
     {
         $rec = SQLSelectOne("SELECT * FROM ha_devices WHERE ID='$id'");
+        $this->log('Deleting ha_device: ' . json_encode($rec, JSON_PRETTY_PRINT), 'delete');
         // some action for related tables
         SQLExec("DELETE FROM ha_components WHERE HA_DEVICE_ID='" . $rec['ID'] . "'");
         SQLExec("DELETE FROM ha_devices WHERE ID='" . $rec['ID'] . "'");
@@ -1204,6 +1233,21 @@ class ha_discovery extends module
         //to-do
     }
 
+    function processSubscription($event, &$details)
+    {
+        if ($event == 'DEVICE_DELETED') {
+            $this->getConfig();
+            $device_id = $details['device_id'];
+            $this->log('DELETE_DEVICE received: ' . json_encode($details, JSON_PRETTY_PRINT), 'delete');
+            if ($device_id && $this->config['UNPAIR_DEVICES_AUTOMATICALLY']) {
+                $ha_device = SQLSelectOne("SELECT ID FROM ha_devices WHERE SDEVICE_ID=" . (int)$device_id);
+                if (isset($ha_device['ID'])) {
+                    $this->unlink_ha_devices($ha_device['ID']);
+                }
+            }
+        }
+    }
+
     /**
      * Install
      *
@@ -1213,7 +1257,15 @@ class ha_discovery extends module
      */
     function install($data = '')
     {
+        subscribeToEvent($this->name, 'DEVICE_DELETED');
         parent::install();
+
+        $components = SQLSelect("SELECT ha_components.LINKED_OBJECT, ha_components.HA_DEVICE_ID, ha_devices.SDEVICE_ID, devices.ID as DEVICE_ID FROM ha_devices, ha_components LEFT JOIN devices ON ha_components.LINKED_OBJECT=devices.LINKED_OBJECT WHERE ha_components.HA_DEVICE_ID=ha_devices.ID AND ha_components.LINKED_OBJECT!='' AND ha_devices.SDEVICE_ID=0 AND devices.ID>0 ORDER BY devices.ID");
+        $total = count($components);
+        for ($i = 0; $i < $total; $i++) {
+            SQLExec("UPDATE ha_devices SET SDEVICE_ID=" . (int)$components[$i]['DEVICE_ID'] . " WHERE SDEVICE_ID=0 AND ha_devices.ID=" . $components[$i]['HA_DEVICE_ID']);
+        }
+
     }
 
     /**
@@ -1260,6 +1312,7 @@ class ha_discovery extends module
  ha_devices: ID int(10) unsigned NOT NULL auto_increment
  ha_devices: TITLE varchar(100) NOT NULL DEFAULT ''
  ha_devices: IDENTIFIER varchar(255) NOT NULL DEFAULT ''
+ ha_devices: SDEVICE_ID int(10) NOT NULL DEFAULT '0'
  ha_devices: MODEL varchar(255) NOT NULL DEFAULT ''
  ha_devices: MANUFACTURER varchar(255) NOT NULL DEFAULT ''
  ha_devices: SW_VERSION varchar(255) NOT NULL DEFAULT ''

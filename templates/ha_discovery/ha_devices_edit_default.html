@@ -96,10 +96,10 @@
  [#endif ID#]
  <a href="?data_source=<#DATA_SOURCE#>" class="btn btn-default "><#LANG_CANCEL#></a>
          [#if ID!=""#]
-         &nbsp;
-         &nbsp;
-         &nbsp;
+         &nbsp;&nbsp;
          <a href="?view_mode=delete_ha_devices&id=<#ID#>" class="btn btn-default btn-danger" onclick="return confirm('<#LANG_ARE_YOU_SURE#>');"><#LANG_DELETE#></a>
+         &nbsp;
+         <a href="?view_mode=unlink_ha_devices&id=<#ID#>" class="btn btn-default btn-danger" onclick="return confirm('<#LANG_ARE_YOU_SURE#>');"><#LANG_DELETE#> + UNLINK</a>
             [#endif#]
 <input type="hidden" name="id" value="<#ID#>">
 <input type="hidden" name="view_mode" value="<#VIEW_MODE#>">

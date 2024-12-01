@@ -123,3 +123,4 @@ if (gr('ajax')) {
     echo json_encode($res, JSON_NUMERIC_CHECK);
     exit;
 }
+
