@@ -288,6 +288,8 @@ class ha_discovery extends module
         $base_topic = $this->config['BASE_TOPIC'];
         if (!$base_topic) $base_topic = 'homeassistant';
 
+        $original_topic = $topic;
+
         if (preg_match('/^' . $base_topic . '\/(.+?)\/config$/', $topic, $m)) {
             //CONFIG
             $topic = $m[1];
@@ -309,20 +311,32 @@ class ha_discovery extends module
             $this->replaceAbbreviations($data);
             $this->log("Component: $component\nNode Id: $node_id\nObject Id: $object_id\nData:\n" . json_encode($data, JSON_PRETTY_PRINT));
             if (isset($data['device'])) {
-                $device_id = $this->processDevice($data['device']);
+                $device_id = $this->processDevice($data['device'], $node_id);
                 if (!$device_id) {
                     $this->log("Could not add device:\n" . json_encode($data['device'], JSON_PRETTY_PRINT), 'error');
                     return false;
                 }
                 if (isset($data['device'])) unset($data['device']);
                 if (isset($data['origin'])) unset($data['origin']);
+
+                $component_ids = array();
+
                 $component_id = $this->processComponent($device_id, $component, $object_id, $data);
+                if ($component_id) {
+                    $component_ids[] = $component_id;
+                }
                 if ($component == 'light' && isset($data['brightness']) && $data['brightness']) {
-                    $brightness_component_id = $this->processComponent($device_id, 'light_brightness', $object_id . '_brightness', $data);
+                    $add_component_id = $this->processComponent($device_id, 'light_brightness', $object_id . '_brightness', $data);
+                    if ($add_component_id) {
+                        $component_ids[] = $add_component_id;
+                    }
                 }
                 if ($component == 'light' && isset($data['supported_color_modes']) && is_array($data['supported_color_modes'])) {
                     foreach ($data['supported_color_modes'] as $color_mode) {
-                        $this->processComponent($device_id, 'light_' . $color_mode, $object_id . '_' . $color_mode, $data);
+                        $add_component_id = $this->processComponent($device_id, 'light_' . $color_mode, $object_id . '_' . $color_mode, $data);
+                        if ($add_component_id) {
+                            $component_ids[] = $add_component_id;
+                        }
                     }
                 }
 
@@ -332,7 +346,10 @@ class ha_discovery extends module
                     if (isset($data['current_temperature_template'])) {
                         $new_data['value_template'] = $data['current_temperature_template'];
                     }
-                    $this->processComponent($device_id, 'climate_temperature', 'climate_temperature', $new_data);
+                    $add_component_id = $this->processComponent($device_id, 'climate_temperature', 'climate_temperature', $new_data);
+                    if ($add_component_id) {
+                        $component_ids[] = $add_component_id;
+                    }
                 }
                 if ($component == 'climate' && isset($data['temperature_state_topic'])) {
                     $new_data = $data;
@@ -343,7 +360,10 @@ class ha_discovery extends module
                     if (isset($data['temperature_command_topic'])) {
                         $new_data['command_topic'] = $data['temperature_command_topic'];
                     }
-                    $this->processComponent($device_id, 'climate_setpoint', 'climate_setpoint', $new_data);
+                    $add_component_id = $this->processComponent($device_id, 'climate_setpoint', 'climate_setpoint', $new_data);
+                    if ($add_component_id) {
+                        $component_ids[] = $add_component_id;
+                    }
                 }
                 if ($component == 'climate' && isset($data['mode_state_topic'])) {
                     $new_data = $data;
@@ -354,7 +374,10 @@ class ha_discovery extends module
                     if (isset($data['mode_command_topic'])) {
                         $new_data['command_topic'] = $data['mode_command_topic'];
                     }
-                    $this->processComponent($device_id, 'climate_mode', 'climate_mode', $new_data);
+                    $add_component_id = $this->processComponent($device_id, 'climate_mode', 'climate_mode', $new_data);
+                    if ($add_component_id) {
+                        $component_ids[] = $add_component_id;
+                    }
                 }
                 if ($component == 'climate' && isset($data['preset_mode_state_topic'])) {
                     $new_data = $data;
@@ -365,7 +388,10 @@ class ha_discovery extends module
                     if (isset($data['preset_mode_command_topic'])) {
                         $new_data['command_topic'] = $data['preset_mode_command_topic'];
                     }
-                    $this->processComponent($device_id, 'climate_preset', 'climate_preset', $new_data);
+                    $add_component_id = $this->processComponent($device_id, 'climate_preset', 'climate_preset', $new_data);
+                    if ($add_component_id) {
+                        $component_ids[] = $add_component_id;
+                    }
                 }
                 if ($component == 'climate' && isset($data['action_topic'])) {
                     $new_data = $data;
@@ -373,13 +399,22 @@ class ha_discovery extends module
                     if (isset($data['action_template'])) {
                         $new_data['value_template'] = $data['action_template'];
                     }
-                    $this->processComponent($device_id, 'climate_action', 'climate_action', $new_data);
+                    $add_component_id = $this->processComponent($device_id, 'climate_action', 'climate_action', $new_data);
+                    if ($add_component_id) {
+                        $component_ids[] = $add_component_id;
+                    }
+                }
+
+                if (is_array($component_ids) && count($component_ids) > 0) {
+                    SQLExec("UPDATE ha_components SET SRC_TOPIC='" . DBSafe($original_topic) . "' WHERE ID IN (" . implode(',', $component_ids) . ")");
                 }
 
             } else {
                 $this->log("No device data:\n" . json_encode($data, JSON_PRETTY_PRINT), 'error');
                 return false;
             }
+        } elseif (preg_match('/^' . $base_topic . '\/(.+)\/log$/', $topic, $m)) {
+            $this->log($msg, 'log');
         } else {
             $data = json_decode($msg, true);
             if (is_array($data)) {
@@ -398,6 +433,7 @@ class ha_discovery extends module
                 $this->log("Message from unknown component: $topic", 'error');
             }
         }
+
     }
 
     function processComponentMessage($component, $data, $force = false)
@@ -567,7 +603,7 @@ class ha_discovery extends module
         return $rec['ID'];
     }
 
-    function processDevice($data)
+    function processDevice($data, $node_id = '')
     {
         if (!isset($data['identifiers']) || !is_array($data['identifiers'])) {
             if (isset($data['name'])) {
@@ -580,6 +616,11 @@ class ha_discovery extends module
         }
         $device_payload = json_encode($data, JSON_PRETTY_PRINT);
         $rec = SQLSelectOne("SELECT * FROM ha_devices WHERE IDENTIFIER='" . $identifier . "'");
+
+        if ($node_id != '') {
+            $rec['IEEEADDR'] = $node_id;
+        }
+
         $rec['UPDATED'] = date('Y-m-d H:i:s');
 
         if (!isset($rec['ID']) || strlen($device_payload) > $rec['DEVICE_PAYLOAD']) {
@@ -1097,11 +1138,20 @@ class ha_discovery extends module
                 $c_payload = json_decode($permit_joins[$i]['COMPONENT_PAYLOAD'], true);
                 if (isset($c_payload['state_topic'])) {
                     $topic = $c_payload['state_topic'] . '/force_remove';
-                    $identifier = $rec['IDENTIFIER'];
-                    $send = array('v' => $identifier);
+                    $ieeeaddr = $rec['IEEEADDR'];
+                    $send = array('v' => $ieeeaddr);
                     $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
                     addToOperationsQueue('ha_discovery_queue', $topic, $payload_to_send, true);
                 }
+            }
+        }
+        $topics = SQLSelect("SELECT DISTINCT(SRC_TOPIC) FROM ha_components WHERE HA_DEVICE_ID=" . $rec['ID']);
+        foreach ($topics as $topic) {
+            $src_topic = $topic['SRC_TOPIC'];
+            if ($src_topic != '') {
+                $send = array('v' => '', 'r' => 1);
+                $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
+                addToOperationsQueue('ha_discovery_queue', $src_topic, $payload_to_send, true);
             }
         }
         $this->delete_ha_devices($rec['ID']);
@@ -1312,6 +1362,7 @@ class ha_discovery extends module
  ha_devices: ID int(10) unsigned NOT NULL auto_increment
  ha_devices: TITLE varchar(100) NOT NULL DEFAULT ''
  ha_devices: IDENTIFIER varchar(255) NOT NULL DEFAULT ''
+ ha_devices: IEEEADDR varchar(255) NOT NULL DEFAULT ''
  ha_devices: SDEVICE_ID int(10) NOT NULL DEFAULT '0'
  ha_devices: MODEL varchar(255) NOT NULL DEFAULT ''
  ha_devices: MANUFACTURER varchar(255) NOT NULL DEFAULT ''
@@ -1328,7 +1379,8 @@ class ha_discovery extends module
  ha_components: LINKED_PROPERTY varchar(100) NOT NULL DEFAULT ''
  ha_components: LINKED_METHOD varchar(100) NOT NULL DEFAULT ''
  ha_components: VALUE varchar(255) NOT NULL DEFAULT ''
- ha_components: MQTT_TOPIC varchar(255) NOT NULL DEFAULT '' 
+ ha_components: MQTT_TOPIC varchar(255) NOT NULL DEFAULT ''
+ ha_components: SRC_TOPIC varchar(255) NOT NULL DEFAULT '' 
  ha_components: COMPONENT_PAYLOAD text
  ha_components: DATA_PAYLOAD text
  ha_components: READ_CODE text

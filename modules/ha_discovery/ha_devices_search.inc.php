@@ -79,6 +79,8 @@ if ($sortby == 'ID') {
     $sortby_ha_devices = "ha_devices.ID DESC";
 } elseif ($sortby == 'IDENTIFIER') {
     $sortby_ha_devices = "ha_devices.IDENTIFIER";
+} elseif ($sortby == 'IEEEADDR') {
+    $sortby_ha_devices = "ha_devices.IEEEADDR";
 } elseif ($sortby == 'UPDATED') {
     $sortby_ha_devices = "ha_devices.UPDATED DESC";
 } elseif ($sortby == 'TITLE') {

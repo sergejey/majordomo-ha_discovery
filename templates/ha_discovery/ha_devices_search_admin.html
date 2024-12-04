@@ -71,7 +71,7 @@
  <thead>
  <tr>
   <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=ID">ID</a></th>
-  <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=IDENTIFIER">ADDR</a></th>
+  <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=IEEEADDR">ieeeAddr</a></th>
   <th><a href="?data_source=<#DATA_SOURCE#>&view_mode=<#VIEW_MODE#>&mode=<#MODE#>&search=[#SEARCH_URL#]&sortby=TITLE"><#LANG_TITLE#></a></th>
   <th><#LANG_DEVICE#></th>
   <th>Manufacturer - Model</th>
@@ -83,7 +83,7 @@
 [#begin RESULT#]
 <tr>
  <td>[#ID#]</td>
- <td><a href="?data_source=<#DATA_SOURCE#>&view_mode=edit_ha_devices&id=[#ID#]&tab=data">[#IDENTIFIER#]</a></td>
+ <td><a href="?data_source=<#DATA_SOURCE#>&view_mode=edit_ha_devices&id=[#ID#]&tab=data">[#IEEEADDR#]</a></td>
  <td><b>[#TITLE#]</a></b></td>
  <td>[#DEVICE#]</td>
  <td>[#MANUFACTURER#] - [#MODEL#]
