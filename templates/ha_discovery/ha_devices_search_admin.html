@@ -43,7 +43,7 @@
 &nbsp;
 [#if COMPONENTS#]
 <p>
- <a href="?ha_object=" class="label label-default[#if HA_OBJECT=""#] label-success[#endif#]"><#LANG_ALL#></a>
+ <a href="?ha_object=" class="label label-default[#if HA_OBJECT=""#] label-success[#endif#]"><#LANG_ALL#> ([#RESULT_TOTAL#])</a>
  [#begin COMPONENTS#]
  <a href="?ha_object=[#HA_OBJECT#]" class="label label-default[#if HA_OBJECT=="<#HA_OBJECT#>"#] label-success[#endif#]">[#HA_OBJECT#]</a>
  [#end COMPONENTS#]

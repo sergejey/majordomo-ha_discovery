@@ -84,16 +84,31 @@ if ($this->tab == 'data') {
                     $seen_objects[$prop['LINKED_OBJECT']] = 1;
                     $sdevice = SQLSelectOne("SELECT ID, LINKED_OBJECT, PARENT_ID FROM devices WHERE LINKED_OBJECT='" . $prop['LINKED_OBJECT'] . "'");
                     if (isset($sdevice['ID'])) {
-                        $linked_devices[] = array('ID' => $sdevice['ID'], 'PARENT_ID' => $sdevice['PARENT_ID']);
+                        $linked_devices[] = array('ID' => $sdevice['ID'], 'PARENT_ID' => $sdevice['PARENT_ID'], 'PROP_ID' => $prop['ID']);
                     }
                 }
             }
             if (count($linked_devices) > 0) {
+
                 usort($linked_devices, function ($a, $b) {
                     return (int)($a['PARENT_ID'] > $b['PARENT_ID']);
                 });
                 $out['LINKED_DEVICES'] = $linked_devices;
             }
+        }
+    } else {
+        if ($this->mode == 'delete_device') {
+            $component = SQLSelectOne("SELECT * FROM ha_components WHERE ID=" . (int)$component_id);
+            $sdevice = SQLSelectOne("SELECT * FROM devices WHERE LINKED_OBJECT='" . $component['LINKED_OBJECT'] . "'");
+            if ($component['ID'] && $sdevice['ID']) {
+                SQLExec("UPDATE ha_components SET LINKED_OBJECT='', LINKED_PROPERTY='', LINKED_METHOD='' WHERE LINKED_OBJECT='" . $component['LINKED_OBJECT'] . "'");
+                SQLExec("UPDATE ha_devices SET SDEVICE_ID=0 WHERE SDEVICE_ID=" . $sdevice['ID']);
+                include_once DIR_MODULES . 'devices/devices.class.php';
+                $dev_module = new devices();
+                $dev_module->delete_devices($sdevice['ID']);
+                $this->redirect("?id=" . $rec['ID'] . "&view_mode=" . $this->view_mode . "&tab=" . $this->tab . "&ok=1");
+            }
+
         }
     }
 
@@ -154,7 +169,7 @@ if ($this->tab == 'data') {
                 $this->redirect("?id=" . $rec['ID'] . "&view_mode=" . $this->view_mode . "&tab=" . $this->tab . "&component_id=" . $component_id . "&ok=1");
             }
         }
-        $properties[$i]['UPDATED']=getPassedText(strtotime($properties[$i]['UPDATED']));
+        $properties[$i]['UPDATED'] = getPassedText(strtotime($properties[$i]['UPDATED']));
     }
     $out['PROPERTIES'] = $properties;
 

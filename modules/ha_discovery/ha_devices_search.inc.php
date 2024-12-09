@@ -117,6 +117,7 @@ if ($res[0]['ID']) {
         $updated_tm = strtotime($res[$i]['UPDATED']);
         $res[$i]['UPDATED'] = getPassedText($updated_tm);
     }
+    $out['RESULT_TOTAL'] = count($res);
     $out['RESULT'] = $res;
 }
 

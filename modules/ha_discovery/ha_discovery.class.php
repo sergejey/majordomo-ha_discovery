@@ -271,8 +271,16 @@ class ha_discovery extends module
             $this->processMessage($_REQUEST['topic'], $_REQUEST['msg']);
         }
         if (isset($params['create_device_id']) && $this->canCreateDevice($params['create_device_id'])) {
-            $this->log("API call to create device: " . $params['create_device_id'], "new_device");
-            $this->createDevice((int)$params['create_device_id']);
+            $id = (int)$params['create_device_id'];
+            $this->log("API call to create device: " . $id, "new_device");
+            clearTimeOut('ha_discovery_new_component_' . $id);
+            $this->createDevice($id);
+        }
+        if (isset($params['component_device_id']) && isset($params['sdevice_id'])) {
+            $sdevice_id = (int)$params['sdevice_id'];
+            $id = (int)$params['component_device_id'];
+            $this->log("API call to check missing components for device: " . $id, "new_device");
+            $this->createDevice($id, $sdevice_id);
         }
         if (isset($params['component_id']) && isset($params['set_value'])) {
             $this->setValue((int)$params['component_id'], $params['set_value']);
@@ -529,6 +537,7 @@ class ha_discovery extends module
 
             if ($component['VALUE'] != $old_value
                 || $value != $old_linked_value
+                || ($component['HA_OBJECT'] == 'linkquality')
                 || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)
                 || $force
             ) {
@@ -597,6 +606,22 @@ class ha_discovery extends module
         if (!isset($rec['ID'])) {
             $rec['UPDATED'] = date('Y-m-d H:i:s');
             $rec['ID'] = SQLInsert('ha_components', $rec);
+
+            $ha_device_rec = SQLSelectOne("SELECT * FROM ha_devices WHERE ID=" . $rec['HA_DEVICE_ID']);
+            if (isset($this->config['CREATE_DEVICES_AUTOMATICALLY']) && $this->config['CREATE_DEVICES_AUTOMATICALLY']) {
+                $id = (int)$rec['HA_DEVICE_ID'];
+                if ($ha_device_rec['SDEVICE_ID']) {
+                    $sdid = $ha_device_rec['SDEVICE_ID'];
+                    $timer_code = "callAPI('/api/module/ha_discovery','GET',array('component_device_id'=>$id,'sdevice_id'=>$sdid));";
+                    setTimeOut('ha_discovery_new_component_' . $id, $timer_code, 5);
+                    $this->log("Setting timer for new component: $timer_code", "new_device");
+                } elseif (!timeOutExists('ha_discovery_new_device_' . $id)) {
+                    $timer_code = "callAPI('/api/module/ha_discovery','GET',array('create_device_id'=>$id));";
+                    setTimeOut('ha_discovery_new_device_' . $id, $timer_code, 3);
+                    $this->log("Setting timer from component: $timer_code", "new_device");
+                }
+            }
+
         } else {
             SQLUpdate('ha_components', $rec);
         }
@@ -658,8 +683,8 @@ class ha_discovery extends module
             if (isset($this->config['CREATE_DEVICES_AUTOMATICALLY']) && $this->config['CREATE_DEVICES_AUTOMATICALLY']) {
                 $id = (int)$rec['ID'];
                 $timer_code = "callAPI('/api/module/ha_discovery','GET',array('create_device_id'=>$id));";
-                setTimeOut('ha_discovery_new_device_' . $rec['ID'], $timer_code, 3);
-                setTimeOut('ha_discovery_new_device_' . $rec['ID'] . '_2nd', $timer_code, 8);
+                setTimeOut('ha_discovery_new_device_' . $id, $timer_code, 3);
+                setTimeOut('ha_discovery_new_device_' . $id . '_2nd', $timer_code, 8);
                 $this->log("Setting timer: $timer_code", "new_device");
             }
         }
@@ -955,10 +980,11 @@ class ha_discovery extends module
             'switch_l3',
             'switch_l4',
             'switch_left',
+            'switch_center',
             'switch_right',
             'switch_top_left',
+            'switch_top_center',
             'switch_top_right',
-            'switch_center',
             'switch_bottom_left',
             'switch_bottom_right');
 
@@ -1011,7 +1037,12 @@ class ha_discovery extends module
             $device_type = 'sensor_pressure';
             $data = array($device_type => array('properties' => array('pressure' => 'value')));
         }
-        if (!$device_type && isset($definition['sensor']['energy'])) {
+        if (!$device_type && isset($definition['sensor']['power'])) {
+            //power sensor
+            $device_type = 'sensor_power';
+            $data = array($device_type => array('properties' => array('power' => 'value')));
+        }
+        if (!$device_type && isset($definition['sensor']['energy']) && !isset($definition_unfiltered['sensor']['power'])) {
             //power sensor
             $device_type = 'sensor_power';
             $data = array($device_type => array('properties' => array('energy' => 'value')));
@@ -1034,6 +1065,7 @@ class ha_discovery extends module
             $data[$device_type]['settings']['batteryOperated'] = 1;
         }
         if ($device_type && is_array($data) && isset($definition['sensor']['linkquality'])) {
+            $data[$device_type]['properties']['aliveTimeout'] = 1; // 1 hour
             $data[$device_type]['methods']['linkquality'] = 'keepAlive';
         }
 
