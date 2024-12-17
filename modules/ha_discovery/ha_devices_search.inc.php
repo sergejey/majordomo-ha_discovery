@@ -115,7 +115,7 @@ if ($res[0]['ID']) {
             }
         }
         $updated_tm = strtotime($res[$i]['UPDATED']);
-        $res[$i]['UPDATED'] = getPassedText($updated_tm);
+        $res[$i]['UPDATED'] = '<span title="'.$res[$i]['UPDATED'].'">'.getPassedText($updated_tm).'</span>';
     }
     $out['RESULT_TOTAL'] = count($res);
     $out['RESULT'] = $res;

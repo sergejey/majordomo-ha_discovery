@@ -280,6 +280,7 @@ class ha_discovery extends module
             $sdevice_id = (int)$params['sdevice_id'];
             $id = (int)$params['component_device_id'];
             $this->log("API call to check missing components for device: " . $id, "new_device");
+            $this->linkMissingAttributes($id, $sdevice_id);
             $this->createDevice($id, $sdevice_id);
         }
         if (isset($params['component_id']) && isset($params['set_value'])) {
@@ -484,6 +485,8 @@ class ha_discovery extends module
         if (is_null($component['VALUE'])) $component['VALUE'] = '';
         $component['DATA_PAYLOAD'] = json_encode($data, JSON_PRETTY_PRINT);
         if ($component['VALUE'] != $old_value
+            || ($component['HA_COMPONENT'] == 'linkquality')
+            || ($component['HA_COMPONENT'] == 'action')
             || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)) {
             if ($component['HA_COMPONENT'] == 'device_automation') {
                 $this->log("New value " . $component['VALUE'] . " <> $old_value (" . json_encode($component) . ")", 'update_automation');
@@ -537,6 +540,7 @@ class ha_discovery extends module
 
             if ($component['VALUE'] != $old_value
                 || $value != $old_linked_value
+                || ($component['HA_OBJECT'] == 'action')
                 || ($component['HA_OBJECT'] == 'linkquality')
                 || ($component['HA_COMPONENT'] == 'device_automation' && $component['VALUE'] == 1)
                 || $force
@@ -714,7 +718,6 @@ class ha_discovery extends module
         }
     }
 
-
     function linkDevice($device_id, $simple_device_id, $exclude_taken = false)
     {
 
@@ -778,6 +781,83 @@ class ha_discovery extends module
                 }
             }
         }
+
+    }
+
+    function linkMissingAttributes($device_id, $sdevice_id)
+    {
+        $ha_device = SQLSelectOne("SELECT * FROM ha_devices WHERE ID=" . (int)$device_id);
+        $s_device = SQLSelectOne("SELECT * FROM devices WHERE ID=" . (int)$sdevice_id);
+        if (!isset($ha_device['ID']) || !isset($s_device['LINKED_OBJECT'])) return false;
+
+        $linked_object = $s_device['LINKED_OBJECT'];
+
+        $this->log("Checking new attributes for " . json_encode($ha_device) . " (device_id: $device_id) " . $_SERVER['REQUEST_URI'], 'new_device');
+        $components = SQLSelect("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . (int)$ha_device['ID']);
+
+        $values = array();
+        $definition = array();
+        $definition_unfiltered = array();
+        $total = count($components);
+        for ($i = 0; $i < $total; $i++) {
+            if ($components[$i]['LINKED_OBJECT'] == '') {
+                $definition[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = json_decode($components[$i]['COMPONENT_PAYLOAD'], true);
+            }
+            $definition_unfiltered[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = json_decode($components[$i]['COMPONENT_PAYLOAD'], true);
+            $values[$components[$i]['HA_COMPONENT']][$components[$i]['HA_OBJECT']] = $components[$i]['VALUE'];
+        }
+
+        $data = array();
+        //check if battery operated
+        if (isset($definition['sensor']['battery'])) {
+            $data['properties']['battery'] = 'batteryLevel';
+            $data['settings']['batteryOperated'] = 1;
+        }
+        // check if link quality set
+        if (isset($definition['sensor']['linkquality'])) {
+            $data['settings']['aliveTimeout'] = 2 * 24; // 2 days
+            $data['methods']['linkquality'] = 'keepAlive';
+        }
+
+        // --------------------------------
+
+        if (is_array($data['properties'])) {
+            foreach ($data['properties'] as $k => $v) {
+                $prop = SQLSelectOne("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . $device_id . " AND HA_OBJECT='" . $k . "'");
+                if (!isset($prop['ID'])) {
+                    continue;
+                }
+                $prop['LINKED_OBJECT'] = $linked_object;
+                if (is_array($v)) {
+                    foreach ($v as $key => $value) {
+                        $prop[$key] = $value;
+                    }
+                } else {
+                    $prop['LINKED_PROPERTY'] = $v;
+                }
+                SQLUpdate('ha_components', $prop);
+                addLinkedProperty($prop['LINKED_OBJECT'], $prop['LINKED_PROPERTY'], $this->name);
+            }
+        }
+
+        if (is_array($data['methods'])) {
+            foreach ($data['methods'] as $k => $v) {
+                $prop = SQLSelectOne("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . $device_id . " AND HA_OBJECT='" . $k . "'");
+                if (!isset($prop['ID'])) {
+                    continue;
+                }
+                $prop['LINKED_OBJECT'] = $linked_object;
+                $prop['LINKED_METHOD'] = $v;
+                SQLUpdate('ha_components', $prop);
+            }
+        }
+
+        if (is_array($data['settings'])) {
+            foreach ($data['settings'] as $k => $v) {
+                sg($linked_object . '.' . $k, $v);
+            }
+        }
+
 
     }
 
@@ -1064,13 +1144,14 @@ class ha_discovery extends module
             $data[$device_type]['properties']['battery'] = 'batteryLevel';
             $data[$device_type]['settings']['batteryOperated'] = 1;
         }
+        // check if link quality set
         if ($device_type && is_array($data) && isset($definition['sensor']['linkquality'])) {
-            $data[$device_type]['properties']['aliveTimeout'] = 1; // 1 hour
+            $data[$device_type]['settings']['aliveTimeout'] = 2 * 24; // 2 days
             $data[$device_type]['methods']['linkquality'] = 'keepAlive';
         }
-
         return $data;
     }
+
 
     function createDevice($device_id, $parent_simple_device_id = 0)
     {

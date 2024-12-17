@@ -169,7 +169,7 @@ if ($this->tab == 'data') {
                 $this->redirect("?id=" . $rec['ID'] . "&view_mode=" . $this->view_mode . "&tab=" . $this->tab . "&component_id=" . $component_id . "&ok=1");
             }
         }
-        $properties[$i]['UPDATED'] = getPassedText(strtotime($properties[$i]['UPDATED']));
+        $properties[$i]['UPDATED'] = '<span title="'.$properties[$i]['UPDATED'].'">'.getPassedText(strtotime($properties[$i]['UPDATED'])).'</span>';
     }
     $out['PROPERTIES'] = $properties;
 
@@ -188,7 +188,7 @@ if ($this->tab == 'data') {
         }
 
         $updated_tm = strtotime($history[$i]['UPDATED']);
-        $diff_str = getPassedText($updated_tm);
+        $diff_str = '<span title="'.$history[$i]['UPDATED'].'">'.getPassedText($updated_tm).'</span>';
 
         $out['HISTORY'] .= $diff_str . ' &mdash; <b>' . $history[$i]['HA_OBJECT'] . ' (' . $history[$i]['HA_COMPONENT'] . ')</b>';
         $out['HISTORY'] .= "<br/><small>";
