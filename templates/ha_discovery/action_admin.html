@@ -19,6 +19,9 @@
             ([#if VALUE="1" || VALUE="on"#]<#LANG_ON#>[#else#]<#LANG_OFF#>[#endif#])
             <a href="?permit_join=[#ID#]&set=1" class="btn btn-default btn-xs"><#LANG_ON#></a>
             <a href="?permit_join=[#ID#]&set=0" class="btn btn-default btn-xs"><#LANG_OFF#></a>
+            <!--#
+            <a href="?view_mode=check_permit_join" class="btn btn-default btn-xs"><i class="glyphicon glyphicon-refresh"></i></a>
+            #-->
             <br/>
             [#end PERMIT_JOINS#]
         [#endif#]

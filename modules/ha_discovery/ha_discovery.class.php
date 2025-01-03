@@ -179,6 +179,12 @@ class ha_discovery extends module
             if ($this->view_mode == '' || $this->view_mode == 'search_ha_devices') {
                 $this->search_ha_devices($out);
             }
+
+            if ($this->view_mode == 'check_permit_join') {
+                $this->checkPermitJoinsLinked();
+                $this->redirect("?data_source=ha_devices");
+            }
+
             if ($this->view_mode == 'edit_ha_devices') {
                 $this->edit_ha_devices($out, $this->id);
             }
@@ -292,6 +298,7 @@ class ha_discovery extends module
     {
 
         //$this->log("$topic :\n$msg", 'ha_discovery');
+        startMeasure('ha_processMessage');
 
         $this->getConfig();
         $base_topic = $this->config['BASE_TOPIC'];
@@ -306,6 +313,7 @@ class ha_discovery extends module
             $last_index = count($items) - 1;
             if ($last_index < 0) {
                 $this->log("Incorrect message", "error");
+                endMeasure('ha_processMessage');
                 return false;
             }
 
@@ -323,6 +331,7 @@ class ha_discovery extends module
                 $device_id = $this->processDevice($data['device'], $node_id);
                 if (!$device_id) {
                     $this->log("Could not add device:\n" . json_encode($data['device'], JSON_PRETTY_PRINT), 'error');
+                    endMeasure('ha_processMessage');
                     return false;
                 }
                 if (isset($data['device'])) unset($data['device']);
@@ -420,6 +429,7 @@ class ha_discovery extends module
 
             } else {
                 $this->log("No device data:\n" . json_encode($data, JSON_PRETTY_PRINT), 'error');
+                endMeasure('ha_processMessage');
                 return false;
             }
         } elseif (preg_match('/^' . $base_topic . '\/(.+)\/log$/', $topic, $m)) {
@@ -442,11 +452,13 @@ class ha_discovery extends module
                 $this->log("Message from unknown component: $topic", 'error');
             }
         }
+        endMeasure('ha_processMessage');
 
     }
 
     function processComponentMessage($component, $data, $force = false)
     {
+        startMeasure('ha_processComponentMessage');
         SQLExec("UPDATE ha_devices SET UPDATED='" . date('Y-m-d H:i:s') . "' WHERE ID=" . (int)$component['HA_DEVICE_ID']);
         $payload = json_decode($component['COMPONENT_PAYLOAD'], true);
         $old_value = $component['VALUE'];
@@ -467,6 +479,7 @@ class ha_discovery extends module
             $b = (int)$data['color']['b'];
             $component['VALUE'] = sprintf("#%02x%02x%02x", $r, $g, $b);
         }
+
         if (isset($payload['payload_off']) && $component['VALUE'] == $payload['payload_off']) {
             $component['VALUE'] = 0;
         } elseif (isset($payload['payload_on']) && $component['VALUE'] == $payload['payload_on']) {
@@ -556,6 +569,7 @@ class ha_discovery extends module
             }
 
         }
+        endMeasure('ha_processComponentMessage');
 
 
     }
@@ -597,6 +611,7 @@ class ha_discovery extends module
 
     function processComponent($device_id, $component_type, $object_id, $data)
     {
+        startMeasure('ha_processComponent');
         $rec = SQLSelectOne("SELECT * FROM ha_components WHERE HA_DEVICE_ID=" . $device_id . " AND HA_OBJECT='" . $object_id . "'");
         $rec['HA_DEVICE_ID'] = $device_id;
         $rec['HA_COMPONENT'] = $component_type;
@@ -626,9 +641,14 @@ class ha_discovery extends module
                 }
             }
 
+            if (preg_match('/join/is', $rec['HA_OBJECT'])) {
+                $this->checkPermitJoinsLinked();
+            }
+
         } else {
             SQLUpdate('ha_components', $rec);
         }
+        endMeasure('ha_processComponent');
         return $rec['ID'];
     }
 
@@ -643,8 +663,14 @@ class ha_discovery extends module
         } else {
             $identifier = $data['identifiers'][0];
         }
+
+        startMeasure('ha_processDevice');
+
         $device_payload = json_encode($data, JSON_PRETTY_PRINT);
         $rec = SQLSelectOne("SELECT * FROM ha_devices WHERE IDENTIFIER='" . $identifier . "'");
+        if (!isset($rec['ID']) && $node_id != '') {
+            $rec = SQLSelectOne("SELECT * FROM ha_devices WHERE IEEEADDR='" . $node_id . "'");
+        }
 
         if ($node_id != '') {
             $rec['IEEEADDR'] = $node_id;
@@ -652,29 +678,33 @@ class ha_discovery extends module
 
         $rec['UPDATED'] = date('Y-m-d H:i:s');
 
+        $title = '';
+        if (isset($data['name']) && $data['name'] != '') {
+            $title = $data['name'];
+        }
+
         if (!isset($rec['ID']) || strlen($device_payload) > $rec['DEVICE_PAYLOAD']) {
             $rec['DEVICE_PAYLOAD'] = $device_payload;
         }
-        $title = '';
-        if (isset($data['name'])) {
-            $title = $data['name'];
-        }
-        if ((!isset($rec['MODEL']) || $rec['MODEL'] == '') && isset($data['model'])) {
+        if (isset($data['model']) && $data['model'] != '') {
             $rec['MODEL'] = $data['model'];
             if ($title == '') $title = $rec['MODEL'];
         }
-        if ((!isset($rec['MANUFACTURER']) || $rec['MANUFACTURER'] == '') && isset($data['manufacturer'])) {
+        if (isset($data['manufacturer']) && $data['manufacturer'] != '') {
             $rec['MANUFACTURER'] = $data['manufacturer'];
         }
-        if ((!isset($rec['SW_VERSION']) || $rec['SW_VERSION'] == '') && isset($data['sw_version'])) {
+        if (isset($data['sw_version']) && $data['sw_version'] != '') {
             $rec['SW_VERSION'] = $data['sw_version'];
         }
-        if ((!isset($rec['HW_VERSION']) || $rec['HW_VERSION'] == '') && isset($data['hw_version'])) {
+        if (isset($data['hw_version']) && $data['hw_version'] != '') {
             $rec['HW_VERSION'] = $data['hw_version'];
         }
+
+
         if ($title == '') {
             $title = $identifier;
         }
+
         if (!isset($rec['TITLE']) || $rec['TITLE'] == '') {
             $rec['TITLE'] = $title;
         }
@@ -692,6 +722,7 @@ class ha_discovery extends module
                 $this->log("Setting timer: $timer_code", "new_device");
             }
         }
+        endMeasure('ha_processDevice');
         return $rec['ID'];
     }
 
@@ -1017,6 +1048,47 @@ class ha_discovery extends module
                 )
             );
         }
+
+        if (!$device_type && isset($definition['light']['light_l1']) && isset($definition['light_brightness']['light_l1_brightness'])) {
+            //dimmer
+            $device_type = 'dimmer';
+            $data = array(
+                $device_type => array(
+                    'properties' => array(
+                        'light_l1' => 'status',
+                        'light_l1_brightness' => 'levelWork'
+                    ),
+                    'settings' => array('switchLevel' => 1)
+                )
+            );
+            $data[$device_type]['settings']['minWork'] = 0;
+            if (isset($definition['light_brightness']['light_l1_brightness']['brightness_scale'])) {
+                $data[$device_type]['settings']['maxWork'] = $definition['light_brightness']['light_l1_brightness']['brightness_scale'];
+            } else {
+                $data[$device_type]['settings']['maxWork'] = 100;
+            }
+        }
+
+        if (!$device_type && isset($definition['light']['light_l2']) && isset($definition['light_brightness']['light_l2_brightness'])) {
+            //dimmer
+            $device_type = 'dimmer';
+            $data = array(
+                $device_type => array(
+                    'properties' => array(
+                        'light_l2' => 'status',
+                        'light_l2_brightness' => 'levelWork'
+                    ),
+                    'settings' => array('switchLevel' => 1)
+                )
+            );
+            $data[$device_type]['settings']['minWork'] = 0;
+            if (isset($definition['light_brightness']['light_l2_brightness']['brightness_scale'])) {
+                $data[$device_type]['settings']['maxWork'] = $definition['light_brightness']['light_l2_brightness']['brightness_scale'];
+            } else {
+                $data[$device_type]['settings']['maxWork'] = 100;
+            }
+        }
+
         if (!$device_type && isset($definition['light']['light']) && isset($definition['light_brightness']['light_brightness'])) {
             //dimmer
             $device_type = 'dimmer';
@@ -1188,7 +1260,7 @@ class ha_discovery extends module
                     }
                 }
                 $options = array('TITLE' => $new_title);
-                if ($type != 'relay') {
+                if ($type != 'relay' && $type != 'dimmer') {
                     $options['PARENT_ID'] = $parent_simple_device_id;
                 }
                 $this->log("Adding new device: " . json_encode($options), 'new_device');
@@ -1238,6 +1310,34 @@ class ha_discovery extends module
     function edit_ha_devices(&$out, $id)
     {
         require(dirname(__FILE__) . '/ha_devices_edit.inc.php');
+    }
+
+    function checkPermitJoinsLinked()
+    {
+        $permit_joins = SQLSelect("SELECT ha_devices.*, ha_components.ID as HA_COMPONENT_ID, ha_components.COMPONENT_PAYLOAD FROM ha_components, ha_devices WHERE ha_components.HA_DEVICE_ID=ha_devices.ID AND (HA_OBJECT='permit_join' OR HA_OBJECT LIKE '%PermitJoin') ORDER BY ha_devices.TITLE");
+        $total = count($permit_joins);
+        for ($i = 0; $i < $total; $i++) {
+            $component = SQLSelectOne("SELECT * FROM ha_components WHERE ID=" . $permit_joins[$i]['HA_COMPONENT_ID']);
+            if ($component['LINKED_OBJECT'] != '') continue;
+
+            // adding new pairing mode
+            if ($component['MQTT_TOPIC'] != '') {
+                $path = explode('/', $component['MQTT_TOPIC']);
+                $object_name = 'pairing_' . $path[0];
+                $object_title = '<#LANG_GENERAL_PAIRING_MODE#> ' . $path[0];
+            } else {
+                $object_name = 'pairing_' . $component['HA_OBJECT'];
+                $object_title = '<#LANG_GENERAL_PAIRING_MODE#> ' . $component['HA_OBJECT'];
+            }
+            if (addClassObject("OperationalModes", $object_name)) {
+                sg($object_name . '.title', $object_title);
+                sg($object_name . '.active', $component['VALUE']);
+                $component['LINKED_OBJECT'] = $object_name;
+                $component['LINKED_PROPERTY'] = 'active';
+                SQLUpdate('ha_components', $component);
+                addLinkedProperty($object_name, 'active', $this->name);
+            }
+        }
     }
 
     function unlink_ha_devices($id)
@@ -1306,19 +1406,20 @@ class ha_discovery extends module
 
     function setValue($component_id, $value)
     {
+        startMeasure('ha_setValue');
         $component_rec = SQLSelectOne("SELECT * FROM ha_components WHERE ID=" . (int)$component_id);
         $component_type = $component_rec['HA_COMPONENT'];
         $payload = json_decode($component_rec['COMPONENT_PAYLOAD'], true);
         $command_topic = isset($payload['command_topic']) ? $payload['command_topic'] : '';
         if (!$command_topic) {
             //$this->log("Command topic not set to update value of component:\n" . json_encode($payload, JSON_PRETTY_PRINT), 'error');
+            endMeasure('ha_setValue');
             return false;
         }
         $schema = isset($payload['schema']) ? $payload['schema'] : 'default';
         $payload_on = isset($payload['payload_on']) ? $payload['payload_on'] : 'ON';
         $payload_off = isset($payload['payload_off']) ? $payload['payload_on'] : 'OFF';
 
-        $data = '';
         if ($component_type == 'light' && $schema == 'json') {
             $data = array();
             $data['state'] = (!$value || strtolower($value) == 'off') ? $payload_off : $payload_on;
@@ -1363,6 +1464,7 @@ class ha_discovery extends module
                 SQLExec("DELETE FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " AND ID<" . $tmp[$keep_total - 1]['ID']);
             }
         }
+        endMeasure('ha_setValue');
 
     }
 
