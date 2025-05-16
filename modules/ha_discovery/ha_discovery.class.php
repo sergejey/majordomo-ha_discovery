@@ -1315,8 +1315,8 @@ class ha_discovery extends module
         $permit_joins = SQLSelect("SELECT ha_devices.*, ha_components.ID as HA_COMPONENT_ID, ha_components.COMPONENT_PAYLOAD FROM ha_components, ha_devices WHERE ha_components.HA_DEVICE_ID=ha_devices.ID AND (HA_OBJECT='permit_join' OR HA_OBJECT LIKE '%PermitJoin') ORDER BY ha_devices.TITLE");
         $total = count($permit_joins);
         for ($i = 0; $i < $total; $i++) {
-            $component = SQLSelectOne("SELECT * FROM ha_components WHERE ID=" . $permit_joins[$i]['HA_COMPONENT_ID']);
-            if ($component['LINKED_OBJECT'] != '') continue;
+            $component = SQLSelectOne("SELECT * FROM ha_components WHERE ID=" . (int)$permit_joins[$i]['HA_COMPONENT_ID']);
+            if (!isset($component['ID']) || $component['LINKED_OBJECT'] != '') continue;
 
             // adding new pairing mode
             if ($component['MQTT_TOPIC'] != '') {
