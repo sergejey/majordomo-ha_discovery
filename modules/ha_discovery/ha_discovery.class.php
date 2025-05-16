@@ -640,13 +640,11 @@ class ha_discovery extends module
                     $this->log("Setting timer from component: $timer_code", "new_device");
                 }
             }
-
-            if (preg_match('/join/is', $rec['HA_OBJECT'])) {
-                $this->checkPermitJoinsLinked();
-            }
-
         } else {
             SQLUpdate('ha_components', $rec);
+        }
+        if (preg_match('/join/is', $rec['HA_OBJECT'])) {
+            $this->checkPermitJoinsLinked();
         }
         endMeasure('ha_processComponent');
         return $rec['ID'];
