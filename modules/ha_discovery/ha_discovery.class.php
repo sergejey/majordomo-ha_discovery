@@ -674,8 +674,6 @@ class ha_discovery extends module
             $rec['IEEEADDR'] = $node_id;
         }
 
-        $rec['UPDATED'] = date('Y-m-d H:i:s');
-
         $title = '';
         if (isset($data['name']) && $data['name'] != '') {
             $title = $data['name'];
@@ -710,6 +708,7 @@ class ha_discovery extends module
         if (isset($rec['ID'])) {
             SQLUpdate('ha_devices', $rec);
         } else {
+            $rec['UPDATED'] = date('Y-m-d H:i:s');
             $rec['IDENTIFIER'] = $identifier;
             $rec['ID'] = SQLInsert('ha_devices', $rec);
             if (isset($this->config['CREATE_DEVICES_AUTOMATICALLY']) && $this->config['CREATE_DEVICES_AUTOMATICALLY']) {
