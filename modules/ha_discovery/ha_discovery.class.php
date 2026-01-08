@@ -591,6 +591,7 @@ class ha_discovery extends module
 
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Template.php';
 
+        $templateString = preg_replace("/\.get\('([\w_]+?)',.+?\)/is","['\\1']",$templateString);
         $templateString = str_replace("']['", '.', $templateString);
         $templateString = str_replace("['", '.', $templateString);
         $templateString = preg_replace("/'\\]\W/", '', $templateString);

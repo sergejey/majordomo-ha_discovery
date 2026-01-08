@@ -52,6 +52,7 @@ class Template
             }
             return $variables[$varName];
         } else {
+            return false;
             if (is_null($undefined)) {
                 $undefined = $this->undefined;
             }
@@ -208,13 +209,16 @@ class Template
             }
             $valueToEvaluate = "'" . $this->addSlashes($var) . "'";
         }
-
         if (is_bool($valueToEvaluate)) {
             return $valueToEvaluate;
         }
-    
+
         $evalResult = "";
-        eval("\$evalResult = $valueToEvaluate;");
+        if ($valueToEvaluate!='') {
+            eval("\$evalResult = $valueToEvaluate;");
+        } else {
+            $evalResult = false;
+        }
         return $evalResult;
     }
 
