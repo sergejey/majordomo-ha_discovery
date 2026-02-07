@@ -96,7 +96,7 @@ while ($mqtt_client->proc()) {
         }
         if ($topic != '') {
             $value = (is_bool($value) ? ($value ? 'true' : 'false') : $value);
-            DebMes("Publishing to $topic: " . $value, 'ha_discovery_set');
+            $ha_discovery_module->log("Publishing to $topic: " . $value, 'set');
             $mqtt_client->publish($topic, $value, $qos, $retain);
         }
     }
@@ -107,7 +107,7 @@ while ($mqtt_client->proc()) {
         $total = count($components);
         for ($i = 0; $i < $total; $i++) {
             if (!isset($subscribed_topics[$components[$i]['MQTT_TOPIC']])) {
-                DebMes("Subscribing to " . $components[$i]['MQTT_TOPIC'], 'ha_discovery_cycle');
+                $ha_discovery_module->log("Subscribing to " . $components[$i]['MQTT_TOPIC'], 'cycle');
                 $subscribed_topics[$components[$i]['MQTT_TOPIC']] = 1;
                 $rec = array($components[$i]['MQTT_TOPIC'] => array("qos" => 0, "function" => "procmsg"));
                 $mqtt_client->subscribe($rec, 0);

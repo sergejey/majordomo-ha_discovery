@@ -164,11 +164,7 @@ class ha_discovery extends module
             $this->config['UNPAIR_DEVICES_AUTOMATICALLY'] = gr('unpair_devices_automatically', 'int');
 
             $this->saveConfig();
-            setGlobal('cycle_ha_discovery', 'restart');
-
-            if (!$this->config['DEBUG_MODE']) {
-                SQLExec("TRUNCATE TABLE ha_history;");
-            }
+            setGlobal('cycle_ha_discoveryControl', 'restart');
 
             $this->redirect("?");
         }
@@ -508,24 +504,16 @@ class ha_discovery extends module
         }
         SQLUpdate('ha_components', $component);
 
-        if (isset($this->config['DEBUG_MODE']) && $this->config['DEBUG_MODE']) {
-            $hist = array();
-            $hist['HA_DEVICE_ID'] = $component['HA_DEVICE_ID'];
-            $hist['HA_COMPONENT_ID'] = $component['ID'];
-            $hist['TOPIC'] = $component['MQTT_TOPIC'];
-            $hist['DESTINATION'] = 0;
-            $hist['DATA_PAYLOAD'] = $component['DATA_PAYLOAD'];
-            $hist['VALUE'] = $component['VALUE'];
-            $hist['UPDATED'] = date('Y-m-d H:i:s');;
-            SQLInsert('ha_history', $hist);
 
-            $keep_total = 20;
-            $tmp = SQLSelect("SELECT ID FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " ORDER BY ID DESC LIMIT $keep_total");
-            if (count($tmp) == $keep_total) {
-                SQLExec("DELETE FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " AND ID<" . $tmp[$keep_total - 1]['ID']);
-            }
-
-        }
+        $hist = array();
+        $hist['HA_DEVICE_ID'] = $component['HA_DEVICE_ID'];
+        $hist['HA_COMPONENT_ID'] = $component['ID'];
+        $hist['TOPIC'] = $component['MQTT_TOPIC'];
+        $hist['DESTINATION'] = 0;
+        $hist['DATA_PAYLOAD'] = $component['DATA_PAYLOAD'];
+        $hist['VALUE'] = $component['VALUE'];
+        $hist['UPDATED'] = date('Y-m-d H:i:s');;
+        SQLInsert('ha_history', $hist);
 
         $linked_object = $component['LINKED_OBJECT'];
         $linked_property = $component['LINKED_PROPERTY'];
@@ -591,7 +579,7 @@ class ha_discovery extends module
 
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Template.php';
 
-        $templateString = preg_replace("/\.get\('([\w_]+?)',.+?\)/is","['\\1']",$templateString);
+        $templateString = preg_replace("/\.get\('([\w_]+?)',.+?\)/is", "['\\1']", $templateString);
         $templateString = str_replace("']['", '.', $templateString);
         $templateString = str_replace("['", '.', $templateString);
         $templateString = preg_replace("/'\\]\W/", '', $templateString);
@@ -1445,25 +1433,17 @@ class ha_discovery extends module
         $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
         addToOperationsQueue('ha_discovery_queue', $command_topic, $payload_to_send, true);
 
-        if (isset($this->config['DEBUG_MODE']) && $this->config['DEBUG_MODE']) {
-            $hist = array();
-            $hist['HA_DEVICE_ID'] = $component_rec['HA_DEVICE_ID'];
-            $hist['HA_COMPONENT_ID'] = $component_rec['ID'];
-            $hist['DESTINATION'] = 1;
-            $hist['TOPIC'] = $command_topic;
-            $hist['DATA_PAYLOAD'] = $send['v'];
-            $hist['VALUE'] = $value;
-            $hist['UPDATED'] = date('Y-m-d H:i:s');
-            SQLInsert('ha_history', $hist);
+        $hist = array();
+        $hist['HA_DEVICE_ID'] = $component_rec['HA_DEVICE_ID'];
+        $hist['HA_COMPONENT_ID'] = $component_rec['ID'];
+        $hist['DESTINATION'] = 1;
+        $hist['TOPIC'] = $command_topic;
+        $hist['DATA_PAYLOAD'] = $send['v'];
+        $hist['VALUE'] = $value;
+        $hist['UPDATED'] = date('Y-m-d H:i:s');
+        SQLInsert('ha_history', $hist);
 
-            $keep_total = 20;
-            $tmp = SQLSelect("SELECT ID FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " ORDER BY ID DESC LIMIT $keep_total");
-            if (count($tmp) == $keep_total) {
-                SQLExec("DELETE FROM ha_history WHERE HA_COMPONENT_ID=" . $hist['HA_COMPONENT_ID'] . " AND ID<" . $tmp[$keep_total - 1]['ID']);
-            }
-        }
         endMeasure('ha_setValue');
-
     }
 
     function propertySetHandle($object, $property, $value)
@@ -1498,6 +1478,19 @@ class ha_discovery extends module
 
     function processSubscription($event, &$details)
     {
+        if ($event == 'HOURLY') {
+            $this->getConfig();
+            $keep_total = 20;
+            $components = SQLSelect("SELECT ID FROM ha_components");
+            $total = count($components);
+            for ($i = 0; $i < $total; $i++) {
+                $tmp = SQLSelect("SELECT ID FROM ha_history WHERE HA_COMPONENT_ID=" . $components[$i]['ID'] . " ORDER BY ID DESC LIMIT " . ($keep_total + 1));
+                if (count($tmp) > $keep_total) {
+                    SQLExec("DELETE FROM ha_history WHERE HA_COMPONENT_ID=" . $components[$i]['ID'] . " AND ID<" . $tmp[$keep_total - 1]['ID']);
+                }
+            }
+        }
+
         if ($event == 'DEVICE_DELETED') {
             $this->getConfig();
             $device_id = $details['device_id'];
@@ -1521,6 +1514,7 @@ class ha_discovery extends module
     function install($data = '')
     {
         subscribeToEvent($this->name, 'DEVICE_DELETED');
+        subscribeToEvent($this->name, 'HOURLY');
         parent::install();
 
         $components = SQLSelect("SELECT ha_components.LINKED_OBJECT, ha_components.HA_DEVICE_ID, ha_devices.SDEVICE_ID, devices.ID as DEVICE_ID FROM ha_devices, ha_components LEFT JOIN devices ON ha_components.LINKED_OBJECT=devices.LINKED_OBJECT WHERE ha_components.HA_DEVICE_ID=ha_devices.ID AND ha_components.LINKED_OBJECT!='' AND ha_devices.SDEVICE_ID=0 AND devices.ID>0 ORDER BY devices.ID");
