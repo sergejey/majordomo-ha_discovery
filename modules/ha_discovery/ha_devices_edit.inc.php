@@ -169,6 +169,7 @@ if ($this->tab == 'data') {
                 $this->redirect("?id=" . $rec['ID'] . "&view_mode=" . $this->view_mode . "&tab=" . $this->tab . "&component_id=" . $component_id . "&ok=1");
             }
         }
+        $properties[$i]['VALUE'] = str_replace(',',', ',$properties[$i]['VALUE']);
         $properties[$i]['UPDATED'] = '<span title="'.$properties[$i]['UPDATED'].'">'.getPassedText(strtotime($properties[$i]['UPDATED'])).'</span>';
     }
     $out['PROPERTIES'] = $properties;
