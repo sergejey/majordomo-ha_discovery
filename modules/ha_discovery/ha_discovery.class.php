@@ -581,7 +581,10 @@ class ha_discovery extends module
 
         $templateString = preg_replace("/\.get\('([\w_]+?)',.+?\)/is", "['\\1']", $templateString);
         $templateString = str_replace("']['", '.', $templateString);
+        $templateString = str_replace("\"][\"", '.', $templateString);
         $templateString = str_replace("['", '.', $templateString);
+        $templateString = str_replace("[\"", '.', $templateString);
+        $templateString = preg_replace("/\"\\]\W/", '', $templateString);
         $templateString = preg_replace("/'\\]\W/", '', $templateString);
 
         $template = new Template($templateString);
