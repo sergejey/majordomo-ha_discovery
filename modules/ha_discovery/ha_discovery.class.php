@@ -3,7 +3,7 @@
  * HA Discovery
  * @package project
  * @author Wizard <sergejey@gmail.com>
- * @copyright http://majordomo.smartliving.ru/ (c)
+ * @copyright https://ru.majordomohome.com/ (c)
  * @version 0.1 (wizard, 19:10:32 [Oct 11, 2024])
  */
 
@@ -564,7 +564,7 @@ class ha_discovery extends module
 
     function parseJingaTemplate($data, $templateString)
     {
-
+        $originalTemplateString = $templateString;
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Loader/LoaderInterface.php';
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Loader/FileSystemLoader.php';
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Loader/StringLoader.php';
@@ -587,10 +587,16 @@ class ha_discovery extends module
         $templateString = preg_replace("/\"\\]\W/", '', $templateString);
         $templateString = preg_replace("/'\\]\W/", '', $templateString);
 
+
         $template = new Template($templateString);
         $value = '';
         try {
             $value = $template->render(array('value_json' => $data));
+            if (empty($value)) {
+                if (preg_match('/if \\\"(\w+)\\\" in value\_json.+?value_json\[\\\"\1\\\"\]/is', $originalTemplateString, $m) && isset($data[$m[1]])) {
+                    $value = $data[$m[1]];
+                }
+            }
             if ($value === false) $value = 0;
             if ($value === true) $value = 1;
         } catch (Exception $e) {
