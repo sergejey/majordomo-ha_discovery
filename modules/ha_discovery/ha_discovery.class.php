@@ -564,7 +564,13 @@ class ha_discovery extends module
 
     function parseJingaTemplate($data, $templateString)
     {
-        $originalTemplateString = $templateString;
+        if (preg_match('/if "(\w+)" in value\_json.+?value\_json\["\1"\]/is', $templateString, $m)) {
+            if (isset($data[$m[1]])) {
+                return $data[$m[1]];
+            } else {
+                return false;
+            }
+        }
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Loader/LoaderInterface.php';
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Loader/FileSystemLoader.php';
         require_once DIR_MODULES . 'ha_discovery/php-jinga/Loader/StringLoader.php';
@@ -592,11 +598,6 @@ class ha_discovery extends module
         $value = '';
         try {
             $value = $template->render(array('value_json' => $data));
-            if (empty($value)) {
-                if (preg_match('/if \\\"(\w+)\\\" in value\_json.+?value_json\[\\\"\1\\\"\]/is', $originalTemplateString, $m) && isset($data[$m[1]])) {
-                    $value = $data[$m[1]];
-                }
-            }
             if ($value === false) $value = 0;
             if ($value === true) $value = 1;
         } catch (Exception $e) {
