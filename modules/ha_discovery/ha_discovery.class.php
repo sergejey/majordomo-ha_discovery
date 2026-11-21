@@ -1350,7 +1350,7 @@ class ha_discovery extends module
                     $ieeeaddr = $rec['IEEEADDR'];
                     $send = array('v' => $ieeeaddr);
                     $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
-                    addToOperationsQueue('ha_discovery_queue', $topic, $payload_to_send, true);
+                    addToOperationsQueue('ha_discovery_queue', $topic, $payload_to_send);
                 }
             }
         }
@@ -1360,7 +1360,7 @@ class ha_discovery extends module
             if ($src_topic != '') {
                 $send = array('v' => '', 'r' => 1);
                 $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
-                addToOperationsQueue('ha_discovery_queue', $src_topic, $payload_to_send, true);
+                addToOperationsQueue('ha_discovery_queue', $src_topic, $payload_to_send);
             }
         }
         $this->delete_ha_devices($rec['ID']);
@@ -1441,7 +1441,7 @@ class ha_discovery extends module
         }
 
         $payload_to_send = json_encode($send, JSON_NUMERIC_CHECK);
-        addToOperationsQueue('ha_discovery_queue', $command_topic, $payload_to_send, true);
+        addToOperationsQueue('ha_discovery_queue', $command_topic, $payload_to_send);
 
         $hist = array();
         $hist['HA_DEVICE_ID'] = $component_rec['HA_DEVICE_ID'];
